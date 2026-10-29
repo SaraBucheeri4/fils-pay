@@ -10,11 +10,12 @@ Verified against a local Docker stack (Postgres 16, all migrations, seed, all se
 
 | State | Items |
 |---|---|
-| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B61, B62 |
+| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B59, B61, B62 |
+| Decided and implemented; locked tests conflict | B58 (reason mandatory; 15 locked refund tests assume it is optional) |
 | Fixed, verification or sign-off outstanding | B03 |
-| Confirmed by reproduction, still open | B10, B11, B12, B14, B58, B59, B60 |
+| Confirmed by reproduction, still open | B10, B11, B12, B14, B60 |
 | Newly recorded (B40–B60) | see "Additional findings" and "Test suite results" at the end |
-| Found in checklist review (B61–B67) | B61 (critical), B62–B64 (high), B65–B67; see "Checklist review" for reclassified items |
+| Found in checklist review (B61–B68) | B61 (critical), B62–B64 and B68 (high), B65–B67; see "Checklist review" for reclassified items |
 
 The source file named above, `bugs.md`, does not exist in this repository or its git history.
 
@@ -925,7 +926,11 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B16, B20, B21. The 11 existing refund tests should pass once fixed, without modifying them.
 
-- [ ] **B59 — Webhook backoff test asserts an exact delay the code randomises**
+**Decision (2026-10-30): a reason is mandatory.** [processRefund.ts](apps/api/src/payments/processRefund.ts) now returns `400 {"error":"refund_reason_required"}` for a missing, empty or whitespace-only reason, before any idempotency claim, acquirer call or database write. The reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5: three rejection cases with no acquirer call and no refund row, one success that stores the reason, and one that stores a padded reason trimmed).
+
+**Open consequence:** 15 locked tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` call refunds without a reason, i.e. they encode "reason optional". The 11 that failed before now fail with 400 instead of the constraint error, and 4 that passed before (decline → 402, voided → refused, invalid amount → 422, unknown transaction → 404) now also stop at the reason check. Resolving this needs a decision: an exception to add a `reason` to those locked calls, corrected copies in new files, or revisiting the decision. The refund UI (`RefundDrawer.tsx`) has no reason field; it must get one when B16 wires the route.
+
+- [x] **B59 — Webhook backoff test asserts an exact delay the code randomises**
 
 **Category:** Invalid test.
 
@@ -938,6 +943,8 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 **Why this approach:** A test should pin intended behaviour, not a coincidence of random input.
 
 **Dependencies / verification:** None. Not caused by any 2026-10-29 change; this is the only non-refund api failure.
+
+**Resolution (2026-10-30), as decided: corrected copy in a new file.** The jitter and the exact-delay assertion were added in the same commit (`c2f3627`), so the test was wrong from the start. New [dispatcher.backoff.new.test.ts](apps/api/src/webhooks/dispatcher.backoff.new.test.ts) repeats the backoff/exhaustion sequence, checks the delay actually applied to each row (`next_attempt_at − last_attempted_at`, both set from one database `now()`) against the ±10 % jitter range, and checks exact values (900/1000/1100 ms, doubling, the 60 s cap) with a fixed jitter source. 3/3 passing, stable across repeated runs. The original locked test is unchanged and still fails; treat that failure as known and superseded.
 
 - [ ] **B60 — Test suites contaminate each other on a shared database**
 
@@ -1053,6 +1060,20 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None. Test self-approval after a display-name change.
 
+- [ ] **B68 — A merchant can refund another merchant's transaction**
+
+**Category:** Merchant isolation / money movement. **High severity (latent until B16).**
+
+**Summary and business impact:** `initiateMerchantRefund` looks up the transaction by id only and then calls `processRefund` with `merchantId: txn.merchant_id`, the transaction's owner, not the caller. The caller's `merchantId` is used only for the refunds-on-hold check. Merchant A can therefore refund merchant B's captured transaction, with the idempotency key, ledger entries and refund row all recorded under B. A comment in the locked test file says so ("another merchant's existing transactionId should also 404. currently refunds it — am") and FH notes the test covering it was deleted.
+
+**Code references:** [apps/api/src/refunds/initiateMerchantRefund.ts](apps/api/src/refunds/initiateMerchantRefund.ts), [apps/api/src/refunds/initiateMerchantRefund.test.ts](apps/api/src/refunds/initiateMerchantRefund.test.ts) (line 170).
+
+**Suggested fixes:** Look the transaction up with `WHERE id = $1 AND merchant_id = $2` using the authenticated merchant, return 404 otherwise, and pass the caller's merchant to `processRefund`.
+
+**Why this approach:** The same ownership rule as B34: enforce it in the query that selects the resource.
+
+**Dependencies / verification:** Must be fixed before B16 wires the route. Add a new test: merchant A refunding merchant B's transaction gets 404 and no refund row exists.
+
 ## Checklist review — 2026-10-29
 
 Every item B01–B60 was re-checked against the code, because this repository is built to mislead reviewers. No item is outright false. These need reclassifying or qualifying:
@@ -1077,7 +1098,7 @@ Run against a dedicated migrated database `filspay_test` (local Docker), TypeScr
 |---|---|---|
 | packages/events | 4/4 ✅ | |
 | packages/money | 40/40 ✅ | |
-| apps/api | 357/369 | 11 × B58 (refund reason), 1 × B59 (invalid jitter test). Includes the new `config.new.test.ts` (5/5) and `auth.new.test.ts` (2/2). |
+| apps/api | 357/369 | 11 × B58 (refund reason), 1 × B59 (invalid jitter test). Includes the new `config.new.test.ts` (5/5) and `auth.new.test.ts` (2/2). **Updated 2026-10-30: 365/381.** The 16 failures are 15 locked refund tests that send no reason (B58, now mandatory; see its entry) and the original B59 test, superseded by `dispatcher.backoff.new.test.ts`. |
 | apps/reporting | 7/11 (11/11 on a clean DB) | 4 failures are B60 contamination from api-test fixtures. |
 | apps/web | 8/8 ✅ | |
 | scripts/ | 5/5 ✅ | Skipped by `npm test` after the first failing workspace; run separately. |

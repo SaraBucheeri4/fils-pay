@@ -42,10 +42,20 @@ export async function processRefund(
   acquirer: AcquirerSimulator,
   input: ProcessRefundInput,
 ): Promise<ProcessRefundResult> {
+  // A refund reason is mandatory (migration 0070 forbids NULL). Rejected
+  // here, before an idempotency key is claimed or the acquirer is called,
+  // so a missing reason is a 400 rather than a constraint violation. The
+  // trimmed value is what is hashed and stored. `reason` stays optional in
+  // the type because callers pass request input.
+  const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+  if (reason === "") {
+    return { statusCode: 400, body: { error: "refund_reason_required" } };
+  }
+
   const requestHash = hashRequest({
     transactionId: input.transactionId,
     amountFils: input.amountFils ?? null,
-    reason: input.reason ?? null,
+    reason,
   });
 
   // 1 validate
@@ -186,7 +196,7 @@ export async function processRefund(
         prepared.requestedAmount,
         feeReversedFils,
         acquirerResult.acquirerReference,
-        input.reason ?? null,
+        reason,
         input.actor.type,
         input.actor.id,
       ],
