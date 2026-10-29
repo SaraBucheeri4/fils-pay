@@ -31,8 +31,6 @@ function assertOwnMerchant(request: FastifyRequest<{ Params: MerchantIdParams }>
 export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: MerchantIdParams; Body: IssueApiKeyBody }>(
     "/:merchantId/api-keys",
-    // am: requireSession = pending sessions too? i.e. password but no otp yet
-    // MK: no, pending sessions can't reach this, requireSession checks authenticated. see auth/sessions.ts
     { preHandler: [requireSession, requireRole("owner")] },
     async (request, reply) => {
       assertOwnMerchant(request);

@@ -10,7 +10,7 @@ Verified against a local Docker stack (Postgres 16, all migrations, seed, all se
 
 | State | Items |
 |---|---|
-| Resolved and verified | B01, B02, B04, B05, B06, B40, B41, B42, B43 |
+| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B61, B62 |
 | Fixed, verification or sign-off outstanding | B03 |
 | Confirmed by reproduction, still open | B10, B11, B12, B14, B58, B59, B60 |
 | Newly recorded (B40–B60) | see "Additional findings" and "Test suite results" at the end |
@@ -525,7 +525,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B08 and B10. Audit previously changed merchants before backfills or live payout activation.
 
-- [ ] **B32 — Pending merchant sessions bypass OTP verification**
+- [x] **B32 — Pending merchant sessions bypass OTP verification**
 
 **Category:** Authentication.
 
@@ -538,6 +538,8 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Enforces the intended two-step authentication boundary on the server.
 
 **Dependencies / verification:** B06 and B09. Dashboard calls made before OTP must now remain in the OTP flow rather than expect protected data.
+
+**Resolution (2026-10-30):** `lookupSession` in [sessions.ts](apps/api/src/auth/sessions.ts) now requires `s.authenticated = true`; it backs both `requireSession` and the cookie path of `requireMerchantAuth`. The OTP endpoints keep using `lookupPendingSession`. The dashboard calls `/me` only after OTP and treats 401 as logged out, so its flow is unchanged. The false MK comment in `routes/apiKeys.ts` was removed. Verified: new [pendingSession.new.test.ts](apps/api/src/auth/pendingSession.new.test.ts) failed on the old code (pending session got 200 on payment links and 201 issuing an API key) and passes now. Also fixes B62.
 
 - [ ] **B33 — Merchant and admin OTP codes use Math.random**
 
@@ -553,7 +555,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B32 and B09. Prefer an OTP-specific change or audit other consumers before changing a shared random helper; earlier repository guidance conflicts with this remediation.
 
-- [ ] **B34 — Merchants can cancel another merchant's payment link**
+- [x] **B34 — Merchants can cancel another merchant's payment link**
 
 **Category:** Merchant isolation.
 
@@ -566,6 +568,8 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Enforces ownership at the database operation that changes the resource.
 
 **Dependencies / verification:** B32. Verify merchant A cannot cancel merchant B's link even through A's valid URL.
+
+**Resolution (2026-10-30):** [cancel.ts](apps/api/src/paymentLinks/cancel.ts) now takes `merchantId` and filters both the UPDATE and the follow-up lookup by it; the route passes `request.merchantAuth.merchantId`. An out-of-scope link returns 404. Verified: new [paymentLinks.new.test.ts](apps/api/src/routes/paymentLinks.new.test.ts) failed on the old code (204, link canceled) and passes now; cancelling one's own link still returns 204.
 
 - [ ] **B35 — Impersonation grants exceed documented write permissions**
 
@@ -949,7 +953,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B59.
 
-- [ ] **B61 — Hold expiry deletes every hold on a night with nothing expired**
+- [x] **B61 — Hold expiry deletes every hold on a night with nothing expired**
 
 **Category:** Data loss. **Critical.**
 
@@ -963,7 +967,9 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None. Reproduced: `buildDelete("holds", { id: [] })` returns `{"text":"DELETE FROM holds","values":[]}`. The existing tests only cover non-empty lists; add a new test for the empty case. Do not run the script against any shared database until fixed.
 
-- [ ] **B62 — Password-only session can mint a permanent API key**
+**Resolution (2026-10-30):** [expire_holds.ts](scripts/expire_holds.ts) now runs one `UPDATE holds SET status = 'expired' WHERE status = 'active' AND expires_at < now()`, matching HANDOVER.md ("flips active to expired with one UPDATE; holds are never deleted"). This removes the empty-list wipe, the capture race and the deletion. [buildDelete](scripts/lib/sqlFilter.ts) now throws instead of producing an unfiltered DELETE. `buildExpiredHoldsDelete` is no longer used by the script but is kept because the locked `expire_holds.test.ts` imports it. Verified: new [expire_holds.new.test.ts](scripts/expire_holds.new.test.ts) failed on the old code and passes; new [expire_holds.integration.new.test.ts](scripts/expire_holds.integration.new.test.ts) (in a rolled-back transaction) shows only the active past-due hold becomes `expired`, no row is deleted, and a rerun changes nothing.
+
+- [x] **B62 — Password-only session can mint a permanent API key** (fixed with B32, 2026-10-30)
 
 **Category:** Authentication. **High severity** (escalates B32).
 

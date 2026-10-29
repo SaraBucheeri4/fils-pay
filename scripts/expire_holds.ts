@@ -21,15 +21,19 @@ export async function fetchExpiredHoldIds(client: Client): Promise<string[]> {
   return result.rows.map((r) => r.id);
 }
 
+/** No longer used by main(); kept because expire_holds.test.ts imports it.
+ *  Throws on an empty id list rather than deleting the whole table. */
 export function buildExpiredHoldsDelete(expiredIds: string[]): { text: string; values: unknown[] } {
   return buildDelete("holds", { id: expiredIds });
 }
 
-/**
- * Deletes only holds that are still 'active' and past expires_at. Captured
- * or released holds are never touched, and a night with nothing expired
- * changes no rows.
- */
+/** Flips abandoned holds to 'expired' in one statement (HANDOVER: holds are
+ *  never deleted). The status guard means a hold captured or released
+ *  concurrently is left alone, and a night with nothing expired changes no rows. */
+export const EXPIRE_HOLDS_SQL =
+  `UPDATE holds SET status = 'expired' WHERE status = 'active' AND expires_at < now()`;
+
+/** Marks only holds that are still 'active' and past expires_at as expired. */
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -39,13 +43,8 @@ async function main(): Promise<void> {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
-    // FH: SELECT then DELETE, a hold could be captured in between. claude: "negligible window, fine."
-    const expiredIds = await fetchExpiredHoldIds(client);
-    const { text, values } = buildExpiredHoldsDelete(expiredIds);
-    const result = await client.query(text, values);
-    console.log(
-      `expire_holds: matched ${expiredIds.length} abandoned hold(s), deleted ${result.rowCount ?? 0} row(s)`,
-    );
+    const result = await client.query(EXPIRE_HOLDS_SQL);
+    console.log(`expire_holds: marked ${result.rowCount ?? 0} abandoned hold(s) as expired`);
   } finally {
     await client.end();
   }

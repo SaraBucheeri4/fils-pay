@@ -23,8 +23,8 @@ each package), not services with their own database connection.
 |---|---|
 | `docker-compose.yml` | the stack |
 | `.env.docker` | shared service settings, loaded by compose for every service |
-| `Dockerfile.node` | image for api, reporting, migrate and seed (`node:20`, full install) |
-| `Dockerfile.go` | multi-stage build of `apps/settlement` |
+| `Dockerfile.node` | image for api, reporting, migrate, seed, web and admin (`node:22`, full install; deps compiled in `node:22-bookworm`, run in `-slim` as the `node` user) |
+| `Dockerfile.go` | multi-stage build of `apps/settlement` (static binary on distroless, non-root) |
 
 > **AM (July):** the two Dockerfiles aren't in the repo for me. built my own
 >
@@ -54,14 +54,30 @@ first.
 
 | Service | Needs | Where it comes from in compose |
 |---|---|---|
-| api | `DATABASE_URL`, `SETTLEMENT_INTERNAL_URL` | `environment:` |
-| api | `WEBHOOK_SECRET_ENCRYPTION_KEY` | only outside dev; a dev key is used otherwise |
-| api | `ACQUIRER_CALLBACK_SIGNING_SECRET`, `NODE_ENV` | `.env.docker` |
+| api | `DATABASE_URL`, `SETTLEMENT_INTERNAL_URL`, `SETTLEMENT_INTERNAL_TOKEN` | `environment:` |
+| api | `WEBHOOK_SECRET_ENCRYPTION_KEY` | required when `NODE_ENV=production`; otherwise a built-in dev key is used (see below) |
+| api | `ACQUIRER_CALLBACK_SIGNING_SECRET`, `NODE_ENV` | required in production only; compose does **not** load `.env.docker`, so these are unset locally and `NODE_ENV` defaults to `development` |
 | settlement | `DATABASE_URL` | `environment:` |
-| settlement | `SETTLEMENT_INTERNAL_TOKEN` | defaults to `dev-token` |
+| settlement | `SETTLEMENT_INTERNAL_TOKEN` | `environment:` (`dev-token`); the daemon exits at boot without it |
 | reporting | `DATABASE_URL` | `environment:`; runs `worker` by default |
 
-> **MK:** the api won't boot without WEBHOOK_SECRET_ENCRYPTION_KEY in any environment. set it on the hosted box.
+### Webhook secret encryption key
+
+Merchant webhook secrets are encrypted at rest with AES-256-GCM, so
+`WEBHOOK_SECRET_ENCRYPTION_KEY` must be base64 that decodes to exactly
+**32 bytes**. The api refuses to start otherwise.
+
+- **Local / development:** leave it unset. The api falls back to a built-in,
+  public dev key. Anything encrypted with it is not secret.
+- **Production or the hosted box:** set `NODE_ENV=production` and a real key.
+  Production never uses the fallback. Generate one with:
+
+  ```bash
+  openssl rand -base64 32
+  ```
+
+  Keep it in the host's secret store, not in this repo. Rotating it makes
+  existing encrypted webhook secrets unreadable, so plan a re-encryption first.
 
 ## Resource sizing
 

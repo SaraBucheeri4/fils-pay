@@ -9,7 +9,6 @@ import {
   promoteSession,
   revokeSession,
 } from "../auth/sessions.js";
-import { findOtpRecipient } from "../auth/users.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { BadRequestError, GoneError, TooManyRequestsError, UnauthorizedError } from "../lib/errors.js";
 
@@ -75,7 +74,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       throw new UnauthorizedError("invalid_credentials");
     }
 
-    const recipient = await findOtpRecipient(app.db, email) ?? user;
+    // The challenge and session belong to the exact merchant_users row that
+    // passed the password check. The same email can exist under several
+    // merchants; an email-only lookup here issued sessions for the wrong one.
+    const recipient = user;
 
     const { code, expiresAt, rawToken } = await withTransaction(app.db, async (client) => {
       const challenge = await issueChallenge(client, {

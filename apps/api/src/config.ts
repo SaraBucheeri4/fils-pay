@@ -150,7 +150,11 @@ function parseBoolEnv(value: string | undefined, fallback: boolean): boolean {
   return value === "true" || value === "1";
 }
 
-const DEV_FALLBACK_WEBHOOK_KEY_B64 = "dGVzdC1rZXktZm9yLWRldi1vbmx5LW5vdC1mb3ItcHJvZA==";
+/** Used only when NODE_ENV is not "production" and no key is set. Decodes to
+ *  the 32 ASCII bytes "filspay-dev-only-key-not-for-prd" (AES-256 needs
+ *  exactly 32). It is public, so anything encrypted with it is not secret;
+ *  production never falls back to it. */
+export const DEV_FALLBACK_WEBHOOK_KEY_B64 = "Zmlsc3BheS1kZXYtb25seS1rZXktbm90LWZvci1wcmQ=";
 
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 

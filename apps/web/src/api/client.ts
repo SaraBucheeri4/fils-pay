@@ -1,6 +1,8 @@
 import type { ApiErrorBody } from "../types.js";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:3000";
+// Same-origin by default: Vite's dev proxy forwards /v1 to the api. Set
+// VITE_API_BASE_URL only for a separately hosted api (which then needs CORS).
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 /** Mirrors apps/api's own uniform `{ error, message? }` body
  *  (lib/errors.ts / plugins/errorHandler.ts) — one error shape end to

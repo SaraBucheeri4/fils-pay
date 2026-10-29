@@ -1,0 +1,18 @@
+# Host node_modules carry macOS binaries for sharp/argon2; the image
+# installs its own.
+**/node_modules
+**/dist
+*.tsbuildinfo
+.git
+.claude
+
+# Secrets and local env files never go into an image.
+.env
+.env.*
+ops/.env.docker
+
+# Not needed at runtime.
+docs
+scripts/out
+npm-debug.log*
+.DS_Store
