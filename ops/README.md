@@ -55,8 +55,9 @@ first.
 | Service | Needs | Where it comes from in compose |
 |---|---|---|
 | api | `DATABASE_URL`, `SETTLEMENT_INTERNAL_URL`, `SETTLEMENT_INTERNAL_TOKEN` | `environment:` |
-| api | `WEBHOOK_SECRET_ENCRYPTION_KEY` | required when `NODE_ENV=production`; otherwise a built-in dev key is used (see below) |
-| api | `ACQUIRER_CALLBACK_SIGNING_SECRET`, `NODE_ENV` | required in production only; compose does **not** load `.env.docker`, so these are unset locally and `NODE_ENV` defaults to `development` |
+| api, seed | `NODE_ENV` | `environment:` (`development`) |
+| api | `WEBHOOK_SECRET_ENCRYPTION_KEY` | required unless `NODE_ENV` is exactly `development` or `test`, where a built-in dev key is used (see below) |
+| api | `ACQUIRER_CALLBACK_SIGNING_SECRET` | required in production only; compose does **not** load `.env.docker`, so it is unset locally |
 | settlement | `DATABASE_URL` | `environment:` |
 | settlement | `SETTLEMENT_INTERNAL_TOKEN` | `environment:` (`dev-token`); the daemon exits at boot without it |
 | reporting | `DATABASE_URL` | `environment:`; runs `worker` by default |
@@ -67,10 +68,13 @@ Merchant webhook secrets are encrypted at rest with AES-256-GCM, so
 `WEBHOOK_SECRET_ENCRYPTION_KEY` must be base64 that decodes to exactly
 **32 bytes**. The api refuses to start otherwise.
 
-- **Local / development:** leave it unset. The api falls back to a built-in,
-  public dev key. Anything encrypted with it is not secret.
+- **Local / development:** leave it unset with `NODE_ENV=development` (compose
+  sets this) or `NODE_ENV=test`. The api falls back to a built-in, public dev
+  key. Anything encrypted with it is not secret.
+- **Anything else, including an unset `NODE_ENV` or a value like `staging`:**
+  a real key is required and the api refuses to start without one.
 - **Production or the hosted box:** set `NODE_ENV=production` and a real key.
-  Production never uses the fallback. Generate one with:
+  Generate one with:
 
   ```bash
   openssl rand -base64 32

@@ -65,6 +65,8 @@ services:
     command: ["npm", "run", "seed"]
     environment:
       DATABASE_URL: postgres://filspay:filspay_dev_password@postgres:5432/filspay?sslmode=disable
+      # Explicit, so the seed (which loads the api config) may use the dev key.
+      NODE_ENV: development
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -73,9 +75,10 @@ services:
     build:
       context: ..
       dockerfile: ops/Dockerfile.node
-    # WEBHOOK_SECRET_ENCRYPTION_KEY isn't needed in dev: NODE_ENV is unset here,
-    # so the api uses its built-in 32-byte dev key. Production must set a real
-    # one (see ops/README.md, "Webhook secret encryption key").
+    # WEBHOOK_SECRET_ENCRYPTION_KEY isn't needed here: NODE_ENV=development
+    # (set explicitly below) lets the api use its built-in 32-byte dev key.
+    # An unset or other NODE_ENV requires a real key; production must set one
+    # (see ops/README.md, "Webhook secret encryption key").
     command: ["npx", "tsx", "apps/api/src/index.ts"]
     ports:
       - "3000:3000"
@@ -86,6 +89,7 @@ services:
       # onboarding to a single password instead of provisioning per-service
       # grants by hand.
       DATABASE_URL: postgres://filspay:filspay_dev_password@postgres:5432/filspay?sslmode=disable
+      NODE_ENV: development
       # TODO(YA, Jan): give the api its own role before anything is hosted.
       SETTLEMENT_INTERNAL_URL: http://settlement:8091
       # Must match the settlement service's token below.

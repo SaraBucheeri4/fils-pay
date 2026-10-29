@@ -150,10 +150,12 @@ function parseBoolEnv(value: string | undefined, fallback: boolean): boolean {
   return value === "true" || value === "1";
 }
 
-/** Used only when NODE_ENV is not "production" and no key is set. Decodes to
- *  the 32 ASCII bytes "filspay-dev-only-key-not-for-prd" (AES-256 needs
- *  exactly 32). It is public, so anything encrypted with it is not secret;
- *  production never falls back to it. */
+/** Used only when NODE_ENV is explicitly "development" or "test" and no key
+ *  is set. Decodes to the 32 ASCII bytes "filspay-dev-only-key-not-for-prd"
+ *  (AES-256 needs exactly 32). It is public, so anything encrypted with it is
+ *  not secret. An unset or unrecognised NODE_ENV (which parseNodeEnv treats as
+ *  development) must still supply a real key, so a misconfigured hosted box
+ *  fails at boot instead of encrypting with a public key. */
 export const DEV_FALLBACK_WEBHOOK_KEY_B64 = "Zmlsc3BheS1kZXYtb25seS1rZXktbm90LWZvci1wcmQ=";
 
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -251,7 +253,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     paymentLinkReservationTimeoutSeconds: parseIntEnv(env.PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS, 60),
 
     webhookSecretEncryptionKey: parseWebhookSecretEncryptionKey(
-      env.WEBHOOK_SECRET_ENCRYPTION_KEY || (nodeEnv !== "production" ? DEV_FALLBACK_WEBHOOK_KEY_B64 : undefined),
+      env.WEBHOOK_SECRET_ENCRYPTION_KEY ||
+        (env.NODE_ENV === "development" || env.NODE_ENV === "test" ? DEV_FALLBACK_WEBHOOK_KEY_B64 : undefined),
     ),
     webhookMaxAttempts: parseIntEnv(env.WEBHOOK_MAX_ATTEMPTS, 8),
     webhookBackoffBaseMs: parseIntEnv(env.WEBHOOK_BACKOFF_BASE_MS, 30_000),

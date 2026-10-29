@@ -1,8 +1,9 @@
 /**
- * B58: a refund reason is mandatory. A missing or blank reason is a 400
- * before any idempotency claim, acquirer call or refund row; a refund with
- * a reason succeeds and stores it. Requires DATABASE_URL to point at a
- * real, migrated Postgres.
+ * B58: a refund reason is optional, as Yousif's original processRefund had
+ * it. Migration 0070 forbids NULL, so a missing or blank reason is stored as
+ * 'unspecified' (0070's column default) instead of failing the insert; a
+ * given reason is stored trimmed. Requires DATABASE_URL to point at a real,
+ * migrated Postgres.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -14,7 +15,7 @@ import { loadConfig } from "../config.js";
 import { issueApiKey } from "../apiKeys/issue.js";
 import { recordKycReview } from "../onboarding/review.js";
 import type { AcquirerRefundResult, AcquirerSimulator } from "../acquirer/types.js";
-import { processRefund } from "./processRefund.js";
+import { processRefund, UNSPECIFIED_REFUND_REASON } from "./processRefund.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -104,7 +105,7 @@ for (const [label, reason] of [
   ["empty", ""],
   ["whitespace-only", "   "],
 ] as const) {
-  test(`a ${label} refund reason is a 400 and nothing is refunded`, async () => {
+  test(`a ${label} refund reason succeeds and is stored as 'unspecified'`, async () => {
     const { merchantId, transactionId, actor } = await capturedTransactionForNewMerchant();
     const acquirer = countingAcquirer();
 
@@ -117,10 +118,9 @@ for (const [label, reason] of [
       ...(reason === undefined ? {} : { reason }),
     });
 
-    assert.equal(result.statusCode, 400, JSON.stringify(result.body));
-    assert.deepEqual(result.body, { error: "refund_reason_required" });
-    assert.equal(acquirer.refundCalls, 0, "the acquirer must not be asked to refund");
-    assert.equal((await refundRows(transactionId)).length, 0);
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    assert.equal(acquirer.refundCalls, 1);
+    assert.deepEqual(await refundRows(transactionId), [{ reason: UNSPECIFIED_REFUND_REASON }]);
   });
 }
 

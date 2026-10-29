@@ -73,6 +73,19 @@ test("a pending (pre-OTP) session cannot read protected merchant data", async ()
   assert.equal(res.statusCode, 401, `pending session got ${res.statusCode}: ${res.body}`);
 });
 
+test("the live_sessions view excludes pending (pre-OTP) sessions", async () => {
+  const { merchantId, email } = await createOwner();
+  await passwordOnlyCookie(merchantId, email);
+
+  const result = await pool.query(
+    `SELECT 1 FROM live_sessions ls
+       JOIN merchant_users mu ON mu.id = ls.merchant_user_id
+      WHERE mu.merchant_id = $1`,
+    [merchantId],
+  );
+  assert.equal(result.rowCount, 0, "a session that never passed OTP must not appear in live_sessions");
+});
+
 test("a pending (pre-OTP) session cannot issue an API key", async () => {
   const { merchantId, email } = await createOwner();
   const cookie = await passwordOnlyCookie(merchantId, email);

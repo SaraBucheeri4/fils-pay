@@ -75,8 +75,9 @@ export interface AuthenticatedSessionLookup {
 }
 
 /** Resolves a fully authenticated (post-OTP) session token to its user.
- *  live_sessions filters only revoked/expired rows, so a pending session is
- *  excluded here explicitly; the OTP endpoints use lookupPendingSession. */
+ *  live_sessions excludes pending sessions since 0075; the explicit check
+ *  stays so this holds on a database that has not run it yet. The OTP
+ *  endpoints use lookupPendingSession. */
 export async function lookupSession(
   pool: Pool,
   rawToken: string,

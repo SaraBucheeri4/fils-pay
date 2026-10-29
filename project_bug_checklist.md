@@ -10,8 +10,7 @@ Verified against a local Docker stack (Postgres 16, all migrations, seed, all se
 
 | State | Items |
 |---|---|
-| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B59, B61, B62 |
-| Decided and implemented; locked tests conflict | B58 (reason mandatory; 15 locked refund tests assume it is optional) |
+| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B58, B59, B61, B62, B68 |
 | Fixed, verification or sign-off outstanding | B03 |
 | Confirmed by reproduction, still open | B10, B11, B12, B14, B60 |
 | Newly recorded (B40–B60) | see "Additional findings" and "Test suite results" at the end |
@@ -120,6 +119,8 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Dependencies / verification:** B01. Existing encrypted secrets require the original key or an explicit migration/rotation procedure.
 
 **Resolution (2026-10-29):** Confirmed the old fallback decoded to the 34-byte text `test-key-for-dev-only-not-for-prod`. [config.ts](apps/api/src/config.ts) now uses a 32-byte dev-only fallback; production still refuses to start without an explicit key, and the 32-byte validation is unchanged. Setup documented in [ops/README.md](ops/README.md) ("Webhook secret encryption key", including `openssl rand -base64 32` and a rotation warning). Verified: new [config.new.test.ts](apps/api/src/config.new.test.ts) passes 5/5, the API boots, and the seed completes. Re-verified inside the running api container (no key set, `NODE_ENV=development`): the key decodes to 32 bytes and an AES-256-GCM encrypt/decrypt round trip succeeds through `secretCrypto.ts`. No stored secrets were affected, because the old key could never start the API. This differs from the suggested fix: the dev key is built in and public rather than a provisioned random key. That is acceptable for local use only; revisit if dev databases ever hold real webhook secrets.
+
+**Follow-up from code review (2026-10-30):** the fix above let any `NODE_ENV` other than exactly `production` boot with the public key, including an unset value or `staging`, because `parseNodeEnv` maps those to development. Previously the broken key made every such box refuse to start. The fallback now applies only when `NODE_ENV` is literally `development` or `test`; anything else requires a real key. Compose now sets `NODE_ENV: development` explicitly on `api` and `seed` (no behaviour change locally), and ops/README.md documents the rule. `config.new.test.ts` was updated (it previously asserted the unsafe unset-NODE_ENV fallback) and passes 9/9.
 
 - [x] **B05 — Settlement internal token is not supplied by Compose**
 
@@ -542,6 +543,10 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Resolution (2026-10-30):** `lookupSession` in [sessions.ts](apps/api/src/auth/sessions.ts) now requires `s.authenticated = true`; it backs both `requireSession` and the cookie path of `requireMerchantAuth`. The OTP endpoints keep using `lookupPendingSession`. The dashboard calls `/me` only after OTP and treats 401 as logged out, so its flow is unchanged. The false MK comment in `routes/apiKeys.ts` was removed. Verified: new [pendingSession.new.test.ts](apps/api/src/auth/pendingSession.new.test.ts) failed on the old code (pending session got 200 on payment links and 201 issuing an API key) and passes now. Also fixes B62.
 
+**Follow-ups from code review (2026-10-30):**
+- *Logout:* `/v1/auth/logout` used `requireSession`, so after this fix a user who abandoned login on the OTP screen could not revoke the pending session. Logout now accepts an authenticated or a pending session and revokes it; no or an invalid cookie is still 401. Verified by new [logout.new.test.ts](apps/api/src/routes/logout.new.test.ts) (3/3, including that a revoked pending session cannot complete OTP).
+- *View:* `live_sessions` still listed pending sessions, so any future reader would reintroduce this bug. New migration [0075_live_sessions_authenticated_only.sql](db/migrations/0075_live_sessions_authenticated_only.sql) adds `authenticated = true` to the view (same columns, so `CREATE OR REPLACE` applies). The explicit check in `lookupSession` stays for databases that have not run 0075. A new test in `pendingSession.new.test.ts` failed before the migration and passes after it. Applied to `filspay_test` only; the local `filspay` database and the Docker image need `docker compose build migrate api` and an `up` to pick it up.
+
 - [ ] **B33 — Merchant and admin OTP codes use Math.random**
 
 **Category:** Authentication randomness.
@@ -912,7 +917,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B02, B03.
 
-- [ ] **B58 — Every refund without a reason violates the refunds constraint**
+- [x] **B58 — Every refund without a reason violates the refunds constraint**
 
 **Category:** Feature blocker (latent until refunds launch).
 
@@ -926,9 +931,12 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B16, B20, B21. The 11 existing refund tests should pass once fixed, without modifying them.
 
-**Decision (2026-10-30): a reason is mandatory.** [processRefund.ts](apps/api/src/payments/processRefund.ts) now returns `400 {"error":"refund_reason_required"}` for a missing, empty or whitespace-only reason, before any idempotency claim, acquirer call or database write. The reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5: three rejection cases with no acquirer call and no refund row, one success that stores the reason, and one that stores a padded reason trimmed).
+**Decision (2026-10-30, final): a reason is optional**, as Yousif designed it. [processRefund.ts](apps/api/src/payments/processRefund.ts) stores a missing, empty or whitespace-only reason as `'unspecified'` (`UNSPECIFIED_REFUND_REASON`, matching 0070's column default) instead of sending NULL; a given reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5). All 15 locked refund tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` now pass **unmodified**; full api suite 391/392.
 
-**Open consequence:** 15 locked tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` call refunds without a reason, i.e. they encode "reason optional". The 11 that failed before now fail with 400 instead of the constraint error, and 4 that passed before (decline → 402, voided → refused, invalid amount → 422, unknown transaction → 404) now also stop at the reason check. Resolving this needs a decision: an exception to add a `reason` to those locked calls, corrected copies in new files, or revisiting the decision. The refund UI (`RefundDrawer.tsx`) has no reason field; it must get one when B16 wires the route.
+**Why optional (evidence):**
+- Yousif's handover (2026-04-09): "`processRefund.ts` is the helper and I'd consider it done: it needs the route and the drawer wired." His original code (`9844457`) had `reason?: string` stored as `input.reason ?? null`, his tests send no reason, and his refunds table (0042) has a nullable `reason TEXT`.
+- 0070's constraint is not his. It sits in `67f8949` (authored as Yousif, committer `placeholder`, dated 2026-01-19), but 0069 shipped in 1.9.0 on 2026-07-21, so 0070 was written after he left on 2026-04-09. No CHANGELOG entry, doc, ADR or meeting note mentions it, and its comment about "existing refunds created before the reason field was required" describes refunds that never existed (the route has always returned 501).
+- It broke a finished feature and its tests, inviting the next maintainer to rewrite the locked tests or make the field mandatory. An interim version of this fix (2026-10-30) made the reason mandatory and broke 15 locked tests; it was reverted after this review.
 
 - [x] **B59 — Webhook backoff test asserts an exact delay the code randomises**
 
@@ -1060,7 +1068,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None. Test self-approval after a display-name change.
 
-- [ ] **B68 — A merchant can refund another merchant's transaction**
+- [x] **B68 — A merchant can refund another merchant's transaction**
 
 **Category:** Merchant isolation / money movement. **High severity (latent until B16).**
 
@@ -1073,6 +1081,8 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 **Why this approach:** The same ownership rule as B34: enforce it in the query that selects the resource.
 
 **Dependencies / verification:** Must be fixed before B16 wires the route. Add a new test: merchant A refunding merchant B's transaction gets 404 and no refund row exists.
+
+**Resolution (2026-10-30):** Fixed in two layers. [initiateMerchantRefund.ts](apps/api/src/refunds/initiateMerchantRefund.ts) looks the transaction up with `WHERE id = $1 AND merchant_id = $2` using the caller's merchant (another merchant's transaction is the same `NotFoundError` as a missing one) and passes the caller's merchant on. [processRefund.ts](apps/api/src/payments/processRefund.ts) also scopes its own lookup by `merchant_id`, so it returns its existing `404 transaction_not_found` even if a future caller passes a mismatched pair. Verified by new [initiateMerchantRefund.new.test.ts](apps/api/src/refunds/initiateMerchantRefund.new.test.ts) (3/3): the cross-merchant test failed on the old code (the refund went through and the acquirer was called) and passes now with no acquirer call and B's transaction untouched; a direct `processRefund` test fails when only the processRefund scoping is reverted; refunding one's own transaction still works. Full api suite: 376/392, the same 16 known failures (B58 locked tests, superseded B59).
 
 ## Checklist review — 2026-10-29
 
@@ -1098,7 +1108,7 @@ Run against a dedicated migrated database `filspay_test` (local Docker), TypeScr
 |---|---|---|
 | packages/events | 4/4 ✅ | |
 | packages/money | 40/40 ✅ | |
-| apps/api | 357/369 | 11 × B58 (refund reason), 1 × B59 (invalid jitter test). Includes the new `config.new.test.ts` (5/5) and `auth.new.test.ts` (2/2). **Updated 2026-10-30: 365/381.** The 16 failures are 15 locked refund tests that send no reason (B58, now mandatory; see its entry) and the original B59 test, superseded by `dispatcher.backoff.new.test.ts`. |
+| apps/api | 357/369 | 11 × B58 (refund reason), 1 × B59 (invalid jitter test). Includes the new `config.new.test.ts` (5/5) and `auth.new.test.ts` (2/2). **Updated 2026-10-30: 391/392.** All 15 locked refund tests pass unmodified now that B58 makes the reason optional. The one failure is the original B59 test, superseded by `dispatcher.backoff.new.test.ts`. |
 | apps/reporting | 7/11 (11/11 on a clean DB) | 4 failures are B60 contamination from api-test fixtures. |
 | apps/web | 8/8 ✅ | |
 | scripts/ | 5/5 ✅ | Skipped by `npm test` after the first failing workspace; run separately. |

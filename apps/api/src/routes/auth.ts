@@ -6,6 +6,7 @@ import { sendOtpCode } from "../auth/notifier.js";
 import {
   createPendingSession,
   lookupPendingSession,
+  lookupSession,
   promoteSession,
   revokeSession,
 } from "../auth/sessions.js";
@@ -291,15 +292,20 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Not behind requireSession: that only accepts post-OTP sessions, and a
+  // user who abandons login on the OTP screen must be able to revoke the
+  // pending session too.
   app.post(
     "/logout",
-    { preHandler: requireSession },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const auth = request.auth;
-      if (!auth) {
+      const token = request.cookies[app.config.cookieName];
+      const session = token
+        ? ((await lookupSession(app.db, token)) ?? (await lookupPendingSession(app.db, token)))
+        : null;
+      if (!session) {
         throw new UnauthorizedError("unauthenticated");
       }
-      await revokeSession(app.db, auth.sessionId);
+      await revokeSession(app.db, session.sessionId);
       reply.setCookie(app.config.cookieName, "", {
         httpOnly: true,
         path: "/",

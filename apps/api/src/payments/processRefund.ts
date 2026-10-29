@@ -36,21 +36,20 @@ interface RefundTransactionRow {
   acquirer_reference: string;
 }
 
+/** Stored when a refund is requested without a reason (migration 0070's default). */
+export const UNSPECIFIED_REFUND_REASON = "unspecified";
+
 /** Refund business logic: validate, call the acquirer, then journal the reversal. */
 export async function processRefund(
   pool: Pool,
   acquirer: AcquirerSimulator,
   input: ProcessRefundInput,
 ): Promise<ProcessRefundResult> {
-  // A refund reason is mandatory (migration 0070 forbids NULL). Rejected
-  // here, before an idempotency key is claimed or the acquirer is called,
-  // so a missing reason is a 400 rather than a constraint violation. The
-  // trimmed value is what is hashed and stored. `reason` stays optional in
-  // the type because callers pass request input.
-  const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-  if (reason === "") {
-    return { statusCode: 400, body: { error: "refund_reason_required" } };
-  }
+  // A refund reason is optional. Migration 0070 forbids NULL in
+  // refunds.reason, so a missing or blank reason is stored as 'unspecified'
+  // (0070's own column default) rather than sent as NULL. A given reason is
+  // trimmed; that value is what is hashed and stored.
+  const reason = input.reason?.trim() || UNSPECIFIED_REFUND_REASON;
 
   const requestHash = hashRequest({
     transactionId: input.transactionId,
@@ -83,9 +82,10 @@ export async function processRefund(
     const txnResult = await client.query<RefundTransactionRow>(
       `SELECT id, merchant_id, status, amount_fils, captured_fils, refunded_fils, acquirer_reference
          FROM transactions
-        WHERE id = $1`,
-      [input.transactionId],
+        WHERE id = $1 AND merchant_id = $2`,
+      [input.transactionId, input.merchantId],
     );
+    // Another merchant's transaction is indistinguishable from a missing one.
     const txn = txnResult.rows[0];
     if (!txn) {
       const body = { error: "transaction_not_found" };
