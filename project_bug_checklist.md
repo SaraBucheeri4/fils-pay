@@ -331,7 +331,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B18. ARCHITECTURE.md currently describes client-time expiry; explicitly supersede that policy when implementing this reported defect.
 
-- [ ] **B18 — Slow payment attempts allow two buyers to pay one link**
+- [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **raised to high: confirmed cause of incident 2026-05-14, still live**
 
 **Category:** Duplicate charge.
 
@@ -344,6 +344,14 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Protects customers before money moves; a longer timeout or a uniqueness error after capture cannot undo a double charge.
 
 **Dependencies / verification:** B17 and B07. Include crash recovery so the fix does not leave links permanently reserved.
+
+**Evidence (2026-10-30): this is the real cause of incident 2026-05-14, which the postmortem misattributes to B19.**
+- [docs/incidents/postmortem-2026-05.md](docs/incidents/postmortem-2026-05.md) says links were "captured more than once" because duplicate acquirer callbacks produced a second capture. Its own timeline records the doubles as "captures are 60–70 s apart".
+- 60 s is exactly `PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS`' default ([config.ts](apps/api/src/config.ts), line 253). The claim in [pay.ts](apps/api/src/paymentLinks/pay.ts) lets a second buyer take a link once `reserved_at` is older than that, while the first buyer's processor call may still be running. Finalize matches only `WHERE id = $1 AND status = 'reserved'`, with no reservation/attempt identity, so it cannot tell whose reservation it is finalizing. Both buyers' captures complete.
+- The callback path cannot produce a capture at all (see B19), so the postmortem's root cause is impossible.
+- The June eng sync ([2026-06-02-eng-sync.md](docs/meetings/2026-06-02-eng-sync.md)) shows the real fix, FP-202 ("one successful capture per link", AM), held back because the PR also changed the timeout to 300 s and MK wanted them split, while the callback "dedupe" (FP-201) was reported deployed. It also closes "holds staying active" (postmortem: two Gamma holds stayed `active` after the extra captures) as a duplicate of the callback issue.
+- Nothing in the code has changed since: B18 is still exploitable whenever an acquirer call outlasts the reservation timeout. Raising the timeout (the FP-202 side change) only narrows the window; the fix is the attempt identity and single-capture guarantee described above.
+- Follow-ups: correct the postmortem's root cause (as a dated correction, not a rewrite); re-check the two Gamma holds and the settled extra captures that finance credited.
 
 - [ ] **B19 — Callback redeliveries insert duplicate notes**
 
@@ -358,6 +366,11 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Database uniqueness protects both sequential retries and simultaneous processes.
 
 **Dependencies / verification:** B23. Review existing duplicate rows before adding uniqueness; do not conflate callback retries with the separate link-reservation bug.
+
+**Evidence (2026-10-30): the claimed fix was never made, and this bug did not cause incident 2026-05-14.**
+- Commit `bf66bf2` ("fix: callbacks are deduplicated now", AM, 2026-05-14) changes **no files**; its message says "They are not. But the incident is closed." No `processed_events` table or unique index on `callback_id` exists in any migration; [0051](db/migrations/0051_acquirer_callback_notes.sql) itself contains "AM: can't find processed_events or FP-238's index anywhere". CHANGELOG 1.6.0/1.9.0, HANDOVER and the postmortem ("hotfix adding callback deduplication (`processed_events`) was deployed at 11:20 on 14 May") all describe a fix that does not exist.
+- The handler ([callbacks.ts](apps/api/src/acquirer/callbacks.ts)) only inserts into `acquirer_callback_notes`, whose `callback_type` is CHECK-constrained to `'fraud_review.completed'`, and its own docblock says it does not change transaction status or the ledger. A redelivered callback therefore duplicates a **note**, never a capture. The postmortem's root cause ("the second application produced a second capture") cannot happen in this code; the doubles came from B18.
+- Severity stays medium: duplicate timeline evidence, not money movement. Still fix with the suggested database uniqueness, and record the false fix claims in the CHANGELOG/postmortem corrections alongside B18.
 
 - [ ] **B20 — Concurrent refunds can return money twice**
 
