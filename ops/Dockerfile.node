@@ -1,0 +1,45 @@
+# Image for every Node service in ops/docker-compose.yml: api, reporting,
+# migrate, seed, web and admin. Build context is the repo root.
+#
+# Node 22: cookie@2 (pulled in by @fastify/cookie) requires node >= 22.
+#
+# Full install (dev dependencies included): the services run TypeScript
+# directly through `tsx`, and web/admin run the Vite dev server, so there is
+# no compile step to strip dependencies after.
+
+# --- deps: full Debian image has python3/make/g++, which argon2 needs to
+# compile its native addon where no prebuilt binary exists (e.g. linux/arm64).
+FROM node:22-bookworm AS deps
+
+WORKDIR /app
+
+# Manifests first so `npm ci` is cached until a dependency actually changes.
+COPY package.json package-lock.json ./
+COPY packages/money/package.json packages/money/
+COPY packages/events/package.json packages/events/
+COPY apps/api/package.json apps/api/
+COPY apps/reporting/package.json apps/reporting/
+COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
+
+RUN npm ci && npm cache clean --force
+
+# --- runtime: same Debian release and glibc as deps, so the compiled
+# argon2/sharp binaries load unchanged.
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+
+# Owned by the runtime user: Vite writes temp/cache files next to its
+# config and under node_modules/.vite, and apps/api writes KYC uploads to
+# ./data/kyc (KYC_UPLOAD_DIR default).
+RUN chown node:node /app
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node . .
+
+USER node
+RUN mkdir -p /app/data/kyc
+
+# Each compose service sets its own command; this is the api's.
+EXPOSE 3000
+CMD ["npx", "tsx", "apps/api/src/index.ts"]

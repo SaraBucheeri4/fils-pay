@@ -4,6 +4,20 @@ Source: [bugs.md](bugs.md). Prepared 2026-10-29. Duplicate reports are consolida
 
 Mark an item complete only when the fix and its dependent behavior have been verified. Integration decisions are tracked separately from confirmed implementation defects. No production-data repair is authorized by this checklist.
 
+## Status update — 2026-10-29
+
+Verified against a local Docker stack (Postgres 16, all migrations, seed, all services running). Nothing was run against staging or production.
+
+| State | Items |
+|---|---|
+| Resolved and verified | B01, B02, B04, B05, B06, B40, B41, B42, B43 |
+| Fixed, verification or sign-off outstanding | B03 |
+| Confirmed by reproduction, still open | B10, B11, B12, B14, B58, B59, B60 |
+| Newly recorded (B40–B60) | see "Additional findings" and "Test suite results" at the end |
+| Found in checklist review (B61–B67) | B61 (critical), B62–B64 (high), B65–B67; see "Checklist review" for reclassified items |
+
+The source file named above, `bugs.md`, does not exist in this repository or its git history.
+
 ## Working rules
 
 - Money amounts must remain whole fils; no floating-point money calculations. Resolve existing decimal input/export contracts explicitly rather than silently changing units.
@@ -24,7 +38,7 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 ## Checklist
 
-- [ ] **B01 — Docker application builds reference missing files**
+- [x] **B01 — Docker application builds reference missing files**
 
 **Category:** Startup blocker.
 
@@ -38,7 +52,11 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B02–B05; cannot run Docker is a broad report: confirm any Docker Desktop/engine error separately.
 
-- [ ] **B02 — Migration 0054 references a nonexistent table**
+**Resolution (2026-10-29):** Added [ops/Dockerfile.node](ops/Dockerfile.node) (Node 22, two-stage so argon2 can compile on linux/arm64) and [ops/Dockerfile.go](ops/Dockerfile.go) (static distroless settlement binary), plus a root [.dockerignore](.dockerignore) that excludes host `node_modules`, `.git`, `docs` and all env files. Compose now orders startup postgres → migrate → seed (optional `seed` profile) → services, and adds `web`/`admin` services. Verified: all seven images build and every service starts. No Dockerfile had ever existed in git history, despite the README and compose comments saying otherwise.
+
+**Re-verified (2026-10-29, B01–B05 review):** `docker compose config` is valid. The api container runs as `node` and settlement as uid 65532 (both non-root). The image contains no `.env*`, `.git` or `docs`. Startup ordering was exercised for real: when migrate failed earlier, no dependent service started.
+
+- [x] **B02 — Migration 0054 references a nonexistent table**
 
 **Category:** Startup blocker.
 
@@ -51,6 +69,22 @@ Dependencies below include both strict prerequisites and changes that must be co
 **Why this approach:** Uses the schema the application actually writes and preserves eligibility for partial captures.
 
 **Dependencies / verification:** B03 follows this migration. Verify a complete fresh migration and an upgrade from an existing schema.
+
+**Status (2026-10-29): startup blocker fixed; item still open.** Added [db/migrations/0053a_settlement_batch_events.sql](db/migrations/0053a_settlement_batch_events.sql), which defines `settlement_batch_events` as a view over `transaction_events.settlement_batch_id` (the column CloseBatch writes), skipped if the relation already exists. Fresh install verified: 0053a–0073 applied cleanly. Outstanding: `v_unbatched_capture_events` still excludes `partially_captured`; the upgrade path from a database that has its own `settlement_batch_events` is untested; and 0054–0056 occupy numbers ADR-0005 reserves for settlement v2.
+
+**Tested (2026-10-29), in throwaway databases since dropped:**
+- Fresh install: all 68 migrations apply from empty. ✅
+- Upgrade from 0053: the working database went 51 → 68. ✅
+- Upgrade where `settlement_batch_events` already exists as a table: the guard skips it and 0054 builds on it; 68/68. ✅
+- Correctness on seeded data: `settlement_batch_events` = batched events (1,200 = 1,200) ✅; no batched event appears as unbatched ✅.
+- ❌ **Still open:** the view lists 217 unbatched captures, but CloseBatch will settle 223. The 6 missing are `partially_captured`. Fix with a new migration that recreates the view using `event_type IN ('captured','partially_captured') AND settlement_batch_id IS NULL`; do not edit 0054 in place (B57). The view has no code consumers today.
+
+**Resolution (2026-10-29):** Added [0074_unbatched_capture_events_include_partial.sql](db/migrations/0074_unbatched_capture_events_include_partial.sql). It redefines `v_unbatched_capture_events` with CloseBatch's own rule (both capture kinds, `settlement_batch_id IS NULL`), keeps the existing columns and appends `occurred_at`. Verified:
+- Upgrade on the working database: the view returns 223 rows and 223 events are CloseBatch-eligible; 0 extra, 0 missing; the 6 partial captures are now included.
+- Fresh install: 69/69 migrations, with the expected column list.
+- The full test suite passes on everything this touches.
+
+The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a governance question recorded under "Repository integrity concerns", not a defect in this fix.
 
 - [ ] **B03 — Migration 0055 uses nonexistent account columns**
 
@@ -66,7 +100,11 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B02. Validate fresh installation and upgrades; do not silently modify migrations already applied elsewhere.
 
-- [ ] **B04 — Development encryption-key fallback has the wrong length**
+**Status (2026-10-29): fixed, awaiting finance sign-off.** [0055](db/migrations/0055_chart_of_accounts_suspense.sql) now inserts `(id, name, kind)` with kind `asset`, matching 0007's existing suspense account. Editing it was safe: as written it could not apply on any database with this schema. Fresh install verified (9 accounts present). Outstanding: finance must confirm the kind for `chargeback_suspense` before first use.
+
+**Tested (2026-10-29):** fresh install and both upgrade paths apply 0055 cleanly. Accounts present: `fx_rounding_difference(asset)` and `chargeback_suspense(asset)`, alongside the 7 existing ones. No longer a startup blocker. **Blocked only on finance sign-off of the account kinds**, which is why this stays unchecked. Neither account is used by code yet. Note that [db/migrate.ts](db/migrate.ts) stores only filenames (no checksum, contrary to the inline comment), so a database that somehow applied a different 0055 would not be detected (see B57).
+
+- [x] **B04 — Development encryption-key fallback has the wrong length**
 
 **Category:** Startup blocker.
 
@@ -80,7 +118,9 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B01. Existing encrypted secrets require the original key or an explicit migration/rotation procedure.
 
-- [ ] **B05 — Settlement internal token is not supplied by Compose**
+**Resolution (2026-10-29):** Confirmed the old fallback decoded to the 34-byte text `test-key-for-dev-only-not-for-prod`. [config.ts](apps/api/src/config.ts) now uses a 32-byte dev-only fallback; production still refuses to start without an explicit key, and the 32-byte validation is unchanged. Setup documented in [ops/README.md](ops/README.md) ("Webhook secret encryption key", including `openssl rand -base64 32` and a rotation warning). Verified: new [config.new.test.ts](apps/api/src/config.new.test.ts) passes 5/5, the API boots, and the seed completes. Re-verified inside the running api container (no key set, `NODE_ENV=development`): the key decodes to 32 bytes and an AES-256-GCM encrypt/decrypt round trip succeeds through `secretCrypto.ts`. No stored secrets were affected, because the old key could never start the API. This differs from the suggested fix: the dev key is built in and public rather than a provisioned random key. That is acceptable for local use only; revisit if dev databases ever hold real webhook secrets.
+
+- [x] **B05 — Settlement internal token is not supplied by Compose**
 
 **Category:** Startup blocker.
 
@@ -94,7 +134,18 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B01. Verify daemon startup and an authenticated API-to-settlement request.
 
-- [ ] **B06 — Browser apps cannot reach the API with current origin configuration**
+**Resolution (2026-10-29):** Compose sets `SETTLEMENT_INTERNAL_TOKEN: dev-token` on both `api` and `settlement`, with `SETTLEMENT_INTERNAL_URL=http://settlement:8091`. The false compose comment ("falls back to dev-token") is corrected. Verified:
+- Without the token, the daemon exits at boot (exit 1, `SETTLEMENT_INTERNAL_TOKEN environment variable is not set`). This was tested against a throwaway database.
+- End to end: finance admin → `POST /v1/admin/settlement/run-batch` (2026-10-28) → API → settlement returned 200. Every batch was `alreadyClosed`/`alreadyPaid`, and 0 batches were newly closed (an idempotent no-op).
+- Direct to settlement from the api container: no token 401, wrong token 401, correct token 200.
+- Existing Go tests `internal/config` (3) and `internal/internalapi` (8) pass against a migrated database.
+
+**Follow-ups (not blockers):**
+- No test covers `RequireInternalToken` (daemon refusal), and the auth test does not cover `/internal/recalculate-mdr`. Add new test files.
+- Outside Docker, the api's default `SETTLEMENT_INTERNAL_URL` is `http://settlement:8091`; a locally run api needs `SETTLEMENT_INTERNAL_URL=http://localhost:8091` and the same token. This is not yet documented in ops/README.
+- ARCHITECTURE.md's settings table still says the token defaults to `dev-token` in dev, which is false.
+
+- [x] **B06 — Browser apps cannot reach the API with current origin configuration**
 
 **Category:** Browser blocker.
 
@@ -107,6 +158,12 @@ Dependencies below include both strict prerequisites and changes that must be co
 **Why this approach:** Provides a consistent browser connection path while retaining cookie authentication.
 
 **Dependencies / verification:** B04 and B32. Test both dashboards through password and OTP login, not just API health.
+
+**Status (2026-10-29): confirmed.** A browser preflight `OPTIONS /v1/auth/login` with `Origin: http://localhost:5173` returns 404; the API registers no CORS handling. Password + OTP login succeeds for merchants and all three admin roles when called directly (curl), so the remaining blocker is the browser origin path.
+
+**Fix applied (2026-10-29), awaiting manual browser confirmation:** development uses the suggested Vite proxy. [apps/web/vite.config.ts](apps/web/vite.config.ts) and [apps/admin/vite.config.ts](apps/admin/vite.config.ts) proxy `/v1` to `API_PROXY_TARGET` (default `http://localhost:3000`; compose sets `http://api:3000`). Both API clients now default to same-origin (`""`); `VITE_API_BASE_URL` / `VITE_ADMIN_API_BASE_URL` still override for a separately hosted api, which would then need credentialed CORS (not added). Also added a `/` → `/dashboard` redirect in [apps/web/src/router.tsx](apps/web/src/router.tsx); `localhost:5173/` previously showed a router 404 because no root route existed. Verified via the frontend origins: admin login → OTP → `/me` → merchant list 200 through :5174; merchant login → OTP → transactions 200 through :5173. Cookies are host-only and HttpOnly. Both apps typecheck. The code comment claiming "CORS is locked to the two origins in config" was false: the api has no CORS configuration.
+
+**Manually confirmed in a browser (2026-10-29):** merchant dashboard login with password + OTP as `owner@gammahospitality.example` (transactions list loads, 25 rows, amounts shown in 3-decimal BHD); admin console login as `superadmin@filspay.test` (merchant list loads). Credentialed CORS for a separately hosted api remains unimplemented; it is only needed if the frontends are ever deployed on a different origin from the api.
 
 - [ ] **B07 — Card processing uses only a simulator**
 
@@ -164,6 +221,8 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B15, B27 and B39. Audit boundary events and missed dates; a scheduler fix does not repair old closed batches.
 
+**Status (2026-10-29): confirmed by simulation.** Replaying `runIfDue`'s logic across a Bahrain midnight: at 00:05–02:59 Bahrain it re-runs the day before yesterday (an idempotent no-op), and it first closes yesterday at 03:00 Bahrain (00:00 UTC). The 15-minute delay never takes effect. Window boundaries themselves (`BusinessDayWindow`) are correct when given a Bahrain date.
+
 - [ ] **B11 — Net payout calculation uses float32 dinars**
 
 **Category:** Money correctness.
@@ -178,6 +237,8 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 **Dependencies / verification:** B25, B28, B30 and B39. Reconcile changed results; preserve historical paid records and correct discrepancies explicitly.
 
+**Status (2026-10-29): confirmed.** With the same arithmetic as `NetPayableFils`, gross 98,765,432 and fee 2,469,136 fils give 96,296,297 instead of 96,296,296: one fil overpaid. Smaller batches tested exact.
+
 - [ ] **B12 — CSV adjustment amounts use a two-decimal parser**
 
 **Category:** Money correctness.
@@ -191,6 +252,8 @@ Dependencies below include both strict prerequisites and changes that must be co
 **Why this approach:** Makes input units explicit and produces whole-fils postings without truncation or floating-point parsing.
 
 **Dependencies / verification:** B13. Audit past imports separately; fixing parsing does not correct existing ledger entries.
+
+**Status (2026-10-29): confirmed by code path.** `parseAdjustmentAmountFils` calls `parseDecimalMinor(raw)` with its default of 2 decimals, so `"4.75"` (the format ADMIN.md tells finance to use) becomes 475 fils = 0.475 BD, ten times too small.
 
 - [ ] **B13 — Balance adjustments affect only the cache despite journaled documentation**
 
@@ -219,6 +282,10 @@ Dependencies below include both strict prerequisites and changes that must be co
 **Why this approach:** A shared accounting definition prevents two supposedly equivalent operations producing different financial answers.
 
 **Dependencies / verification:** B13 first or coordinated. Rebuilds erase cache-only adjustments; compare before/after values and ledger totals before rollout.
+
+**Status (2026-10-29): confirmed, and worse than a source mismatch.** `merchant_payable_position` (0054) is `SUM(scheme_export_lines.amount_fils)` per merchant: lifetime gross, truncated to 10 fils, with no fees or payouts subtracted. The console's **Rebuild cached balances** therefore sets every merchant's balance to an inflated figure, and support's documented workflow then hand-corrects it with cache-only **Adjust balance**. Escalate to finance before anyone presses the button.
+
+**Test locks in the bug:** `TestRebuildBalances_ValidToken` ([server_test.go](apps/settlement/internal/internalapi/server_test.go)) seeds a batch with gross 12,000 and net payout 11,700, then *requires* the rebuilt balance to be 12,000 (gross). It passes because the code is wrong. Per the working rules, this test must not dictate the fix; add a replacement test in a new file when B14 is resolved.
 
 - [ ] **B15 — Scheme residue is not posted during batch close**
 
@@ -569,3 +636,454 @@ Dependencies below include both strict prerequisites and changes that must be co
 **Why this approach:** Measures the money moved in the requested period instead of repeatedly counting cumulative totals; correctness comes before tuning.
 
 **Dependencies / verification:** B10, B11 and B16. Verify captures spanning multiple days and profile representative high-volume data.
+
+## Additional findings (recorded 2026-10-29)
+
+Found while getting the local stack running and cross-referencing migrations, code and seed. Same format as above. "Latent" means the code path is not reachable today.
+
+- [x] **B40 — Node containers could not write to their own app directory**
+
+**Category:** Startup blocker (introduced and fixed in B01's new Dockerfile).
+
+**Summary and business impact:** The app files were owned by root while containers run as the non-root `node` user. Vite failed with `EACCES` writing its config timestamp file, so `web` and `admin` exited on start.
+
+**Code references:** [ops/Dockerfile.node](ops/Dockerfile.node).
+
+**Suggested fixes:** Give the runtime user ownership of `/app` (`COPY --chown=node:node`) rather than running as root.
+
+**Why this approach:** Keeps the containers non-root while letting Vite write its cache and the API write KYC uploads.
+
+**Dependencies / verification:** B01.
+
+**Resolution (2026-10-29):** Fixed as suggested. Verified: `web` (:5173) and `admin` (:5174) start and return 200.
+
+- [x] **B41 — Documented Node version cannot install the dependencies**
+
+**Category:** Startup blocker / documentation.
+
+**Summary and business impact:** ops/README specified `node:20`, but `cookie@2` (via `@fastify/cookie`) requires Node ≥ 22, and `argon2` has no prebuilt linux/arm64 binary, so it needs Python and a C++ toolchain. `npm ci` failed in a Node 20 slim image.
+
+**Code references:** [ops/Dockerfile.node](ops/Dockerfile.node), [ops/README.md](ops/README.md), [package-lock.json](package-lock.json).
+
+**Suggested fixes:** Use Node 22; compile native modules in the full Debian image and copy them into the slim runtime of the same Debian release.
+
+**Why this approach:** Matches the lockfile's engine requirements without shipping a compiler in the runtime image.
+
+**Dependencies / verification:** B01.
+
+**Resolution (2026-10-29):** Fixed as suggested; README updated. Verified: `npm ci` succeeds and argon2 password hashing works (seed and logins).
+
+- [x] **B42 — Merchant login can create a session for a different merchant**
+
+**Category:** Authentication / merchant isolation. **High severity.**
+
+**Summary and business impact:** `/v1/auth/login` verifies the password for the requested merchant, then issues the OTP challenge and session for `findOtpRecipient(email)`: any active user with that email at any merchant (`LIMIT 1`, no ordering). A person with accounts at two merchants can land in the wrong merchant's dashboard with that account's role.
+
+**Code references:** [apps/api/src/routes/auth.ts](apps/api/src/routes/auth.ts) (line 78), [apps/api/src/auth/users.ts](apps/api/src/auth/users.ts).
+
+**Suggested fixes:** Issue the challenge and session for the already-verified `user`, never an email-only lookup. If OTP delivery needs a contact address, read it from that same row.
+
+**Why this approach:** The identity that passed the password check is the only identity the session may represent.
+
+**Dependencies / verification:** B32 (both concern the merchant session boundary). Add a new test: the same email at two merchants must yield a session for the requested merchant only.
+
+**Status (2026-10-29): confirmed locally.** Logging in to Beta Digital Services as `owner@alpharetail.example` returned `merchantId` of Alpha Retail Co. Not fixed; awaiting approval because it changes authentication.
+
+**Resolution (2026-10-29):** [auth.ts](apps/api/src/routes/auth.ts) now issues the challenge and session for the `user` row that passed the password check. The email-only helper `apps/api/src/auth/users.ts` (`findOtpRecipient`, no other callers) was deleted so it cannot be reused. New test [auth.new.test.ts](apps/api/src/routes/auth.new.test.ts) covers two cases: the same email at two merchants, each login lands in the requested merchant with that row's role; and a password valid at merchant A is rejected at merchant B. Verified:
+- Against the original code the first test **fails** (wrong merchantId returned); against the fix both pass. The test fails deterministically on the bug whichever row Postgres picks.
+- On the running site after an api rebuild: Alpha → Alpha and Beta → Beta for the shared email.
+
+Existing sessions issued before the fix may belong to the wrong merchant; in a real deployment, revoke merchant sessions for emails that exist under more than one merchant.
+
+- [x] **B43 — Reporting refund rollup writes columns no migration creates**
+
+**Category:** Schema gap (latent).
+
+**Summary and business impact:** `applyDailySummaryRollup` writes `merchant_daily_volume.refund_count` and `refund_gross_fils`, which 0027 never created. It would fail the first time refunds are wired into reporting.
+
+**Code references:** [apps/reporting/src/consumer/applyEvent.ts](apps/reporting/src/consumer/applyEvent.ts), [db/migrations/0027_merchant_daily_volume.sql](db/migrations/0027_merchant_daily_volume.sql).
+
+**Suggested fixes:** Add the columns in a new migration with zero defaults.
+
+**Why this approach:** Additive and safe on existing rows; no data rewrite.
+
+**Dependencies / verification:** B16, B44.
+
+**Resolution (2026-10-29):** Added [0073_merchant_daily_volume_refunds.sql](db/migrations/0073_merchant_daily_volume_refunds.sql). Verified: both columns exist after migration. The rollup itself is still not wired (B16) and buckets by the wrong date (B44).
+
+- [ ] **B44 — Refund daily rollup buckets by UTC date**
+
+**Category:** Business timing (latent).
+
+**Summary and business impact:** The rollup keys on `occurredAt.toISOString().slice(0, 10)`, the UTC date. Refunds between 00:00 and 03:00 Bahrain time land on the previous business day, unlike captures and settlement.
+
+**Code references:** [apps/reporting/src/consumer/applyEvent.ts](apps/reporting/src/consumer/applyEvent.ts), [apps/reporting/src/bahrainDate.ts](apps/reporting/src/bahrainDate.ts).
+
+**Suggested fixes:** Use the existing `toBahrainDateString` helper.
+
+**Why this approach:** One business calendar across all reporting.
+
+**Dependencies / verification:** B10, B16. Test refunds at 23:59 and 00:01 Bahrain time.
+
+- [ ] **B45 — Refund summary view joins on the wrong column**
+
+**Category:** Reporting correctness (latent).
+
+**Summary and business impact:** `refund_merchant_summary` (0072) joins `transactions t ON t.id = r.id` (the refund's own id) instead of `r.transaction_id`, so it is always empty. Nothing reads it yet.
+
+**Code references:** [db/migrations/0072_refund_merchant_summary.sql](db/migrations/0072_refund_merchant_summary.sql).
+
+**Suggested fixes:** Recreate the materialized view in a new migration with the correct join. 0072 applies successfully, so do not edit it in place.
+
+**Why this approach:** Databases that already ran 0072 get the correction through normal migration.
+
+**Dependencies / verification:** B16.
+
+- [ ] **B46 — Platform volume counter overflows int32**
+
+**Category:** Money correctness.
+
+**Summary and business impact:** `platform_stats.total_processed_fils` is `INTEGER`, and the Go code reads and writes it as `int32`. The maximum is about 2,147,483.647 BD, just above the 2,000,000 BD volume-tier threshold. Once exceeded, the counter wraps negative (or the write fails) and the platform-wide tier discount silently disappears.
+
+**Code references:** [apps/settlement/internal/settlement/platform_volume.go](apps/settlement/internal/settlement/platform_volume.go), [db/migrations/0049_platform_stats.sql](db/migrations/0049_platform_stats.sql).
+
+**Suggested fixes:** Migrate the column to `BIGINT` and use `int64` throughout; reject or alert on overflow.
+
+**Why this approach:** ADR-0001 requires `BIGINT` money columns.
+
+**Dependencies / verification:** Check the production value before migrating.
+
+- [ ] **B47 — Promotional discount parser uses floats and cents**
+
+**Category:** Money correctness (latent; not called anywhere today).
+
+**Summary and business impact:** `parsePromotionalDiscountFils` does `Math.round(parseFloat(raw) * 100)`: float parsing, and ×100 instead of ×1000. `"1.500"` becomes 150 fils instead of 1500.
+
+**Code references:** [apps/api/src/payments/discountAdjustment.ts](apps/api/src/payments/discountAdjustment.ts).
+
+**Suggested fixes:** Use `parseBhdToFils`, or delete the unused function.
+
+**Why this approach:** ADR-0001: one exact parser for BD text.
+
+**Dependencies / verification:** None.
+
+- [ ] **B48 — Refund settlement notification divides the amount by 10**
+
+**Category:** Money correctness (latent; not called anywhere today).
+
+**Summary and business impact:** `notifySettlementRefundAdjustment` sends `Math.round(amountFils / 10)` labelled as fils, while `feeReversedFils` in the same payload is sent unscaled. Settlement would deduct a tenth of the refund.
+
+**Code references:** [apps/api/src/admin/settlementClient.ts](apps/api/src/admin/settlementClient.ts).
+
+**Suggested fixes:** Send integer fils unchanged; settlement already works in fils.
+
+**Why this approach:** No unit conversion between services (ADR-0001).
+
+**Dependencies / verification:** B16.
+
+- [ ] **B49 — Settlement report fee estimate uses floating-point rates**
+
+**Category:** Money correctness.
+
+**Summary and business impact:** `estimateFeeFils` multiplies by `bps / 10000` as floats and rounds once with `Math.round` (half-up), unlike settlement's integer half-to-even `ComputeSettlementFee`. The report's fees can disagree with the batch by a fil per event.
+
+**Code references:** [apps/api/src/fees/estimate.ts](apps/api/src/fees/estimate.ts), [apps/api/src/settlement/query.ts](apps/api/src/settlement/query.ts), [apps/settlement/internal/settlement/discounted_fee.go](apps/settlement/internal/settlement/discounted_fee.go).
+
+**Suggested fixes:** Mirror the Go calculation with `applyRateFils` (discount first, then MDR).
+
+**Why this approach:** CLAUDE.md treats the Go service as the fee reference; one rounding rule everywhere.
+
+**Dependencies / verification:** B39. Compare report and batch fees across seed data.
+
+- [ ] **B50 — Payment-link tokens use Math.random**
+
+**Category:** Payment authorization.
+
+**Summary and business impact:** ARCHITECTURE.md states link tokens are 128-bit from `crypto.randomBytes`; the code builds them from `Math.random`. A link token is what lets someone pay a link, so it should be unpredictable.
+
+**Code references:** [apps/api/src/paymentLinks/create.ts](apps/api/src/paymentLinks/create.ts), [apps/api/src/lib/random.ts](apps/api/src/lib/random.ts).
+
+**Suggested fixes:** Generate from `crypto.randomBytes` (or `crypto.randomInt` per character) with at least 128 bits of entropy.
+
+**Why this approach:** Matches the documented design; uniqueness constraints do not provide unpredictability.
+
+**Dependencies / verification:** B33 (same helper). CLAUDE.md and .cursorrules call this acceptable, which conflicts with ARCHITECTURE.md.
+
+- [ ] **B51 — Admin invite code references a table that does not exist**
+
+**Category:** Schema gap / authentication randomness (dead code).
+
+**Summary and business impact:** `inviteCode.ts` reads and writes `admin_invites`, which no migration creates, and generates admin invite codes with `Math.random`. Nothing imports it today.
+
+**Code references:** [apps/api/src/admin/inviteCode.ts](apps/api/src/admin/inviteCode.ts).
+
+**Suggested fixes:** Delete it, or add a migration and switch to `crypto` before wiring it up.
+
+**Why this approach:** Prevents a broken, weakly random admin-onboarding path from being enabled later.
+
+**Dependencies / verification:** None.
+
+- [ ] **B52 — Seed wipes every merchant-linked table**
+
+**Category:** Operational safety.
+
+**Summary and business impact:** The seed runs `TRUNCATE … merchants … CASCADE`, which empties every table that references merchants (refunds, credits, webhooks, API keys, fee schedules, and more). The RUNBOOK and compose comments say the seed only touches its own fixtures and is safe against a shared staging database. That claim explains the staging-2 reset.
+
+**Code references:** [db/seed/generate.ts](db/seed/generate.ts), [docs/RUNBOOK.md](docs/RUNBOOK.md), [ops/docker-compose.yml](ops/docker-compose.yml).
+
+**Suggested fixes:** Refuse to run unless the database is clearly local or disposable (an explicit flag or a database-name check); correct the documentation.
+
+**Why this approach:** A guard is more reliable than a warning in a runbook.
+
+**Dependencies / verification:** None. Do not run the seed against any shared database until fixed.
+
+- [ ] **B53 — Acquirer callback signing secret is committed to git**
+
+**Category:** Security.
+
+**Summary and business impact:** `ops/.env.docker` is tracked in git and contains `ACQUIRER_CALLBACK_SIGNING_SECRET` and `NODE_ENV=production`. Its comments say it is gitignored, but `.gitignore` lists only `.env`, and compose never loads the file anyway.
+
+**Code references:** [ops/.env.docker](ops/.env.docker), [.gitignore](.gitignore), [ops/docker-compose.yml](ops/docker-compose.yml).
+
+**Suggested fixes:** Rotate the secret with the acquirer, remove the file from git and add it to `.gitignore`, and provide a committed `.env.docker.example` without values.
+
+**Why this approach:** Anyone with repository access has the secret; deleting the file alone leaves it in history.
+
+**Dependencies / verification:** B23. Confirm with the acquirer whether this is the sandbox or a live secret.
+
+- [ ] **B54 — Orphaned "production-equivalent" seed file**
+
+**Category:** Data hygiene / possible data exposure.
+
+**Summary and business impact:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql) (50,338 lines, labelled "production-equivalent", from a "prod-mirror" environment) is referenced by no code, config or doc. It posts to four ledger accounts that do not exist (`merchant_receivable`, `platform_fee`, `refund_payable`, `settlement_holding`), so it could not load.
+
+**Code references:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql).
+
+**Suggested fixes:** Find out who added it and whether it contains real merchant or customer data; if it does, remove it and handle as a data incident.
+
+**Why this approach:** Production-derived data in a repository is a confidentiality risk regardless of whether code uses it.
+
+**Dependencies / verification:** None.
+
+- [ ] **B55 — Documented nightly balance refresh does not exist**
+
+**Category:** Documentation / operations.
+
+**Summary and business impact:** ARCHITECTURE.md and ADMIN.md say the daemon refreshes cached balances at 02:00 Bahrain time. The daemon only closes batches and enqueues payout notifications.
+
+**Code references:** [apps/settlement/internal/scheduler/daemon.go](apps/settlement/internal/scheduler/daemon.go), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ADMIN.md](docs/ADMIN.md).
+
+**Suggested fixes:** Decide whether a nightly refresh is wanted (and from which source, per B14); then implement it or remove the claim.
+
+**Why this approach:** Support and finance rely on that claim when judging balance staleness.
+
+**Dependencies / verification:** B14.
+
+- [ ] **B56 — AI agent rule files contradict ADR-0001 and the settlement window**
+
+**Category:** Documentation / process risk.
+
+**Summary and business impact:** CLAUDE.md, AGENTS.md and .cursorrules state that money is integer cents (1 BD = 100), that `INTEGER` columns are fine, that `float32` is acceptable in Go, and that settlement uses UTC midnight. ADR-0001, ARCHITECTURE.md and the money package all say 1 BD = 1000 fils, `BIGINT`, and no floats; settlement is Bahrain midnight. Any assistant following these files would introduce the bugs in B11, B12 and B46.
+
+**Code references:** [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md), [.cursorrules](.cursorrules), [docs/adr/0001-integer-fils.md](docs/adr/0001-integer-fils.md).
+
+**Suggested fixes:** Correct all three files to match ADR-0001 and ARCHITECTURE.md, and have the corrections reviewed.
+
+**Why this approach:** These files are read automatically by coding assistants.
+
+**Dependencies / verification:** None.
+
+- [ ] **B57 — Migration runner does not checksum applied files**
+
+**Category:** Process / documentation.
+
+**Summary and business impact:** A comment in `db/migrate.ts` (MK) says applied migrations are checksummed and edits are refused. `schema_migrations` stores only filename and timestamp, so an edited migration is silently skipped on databases that already ran it, and the schemas drift.
+
+**Code references:** [db/migrate.ts](db/migrate.ts).
+
+**Suggested fixes:** Store a content hash per file and fail on mismatch, or correct the comment and enforce "never edit applied migrations" in review.
+
+**Why this approach:** Makes the existing rule enforceable.
+
+**Dependencies / verification:** B02, B03.
+
+- [ ] **B58 — Every refund without a reason violates the refunds constraint**
+
+**Category:** Feature blocker (latent until refunds launch).
+
+**Summary and business impact:** `processRefund` inserts `reason = input.reason ?? null`. Migration 0070 (from commit `67f8949`) set a default of `'unspecified'` and added `CHECK (reason IS NOT NULL)`. A column default applies only when the column is omitted, not when NULL is sent explicitly, so every refund without a reason is rejected with `chk_refunds_reason_not_null`. This causes 11 of the 12 api test failures (processRefund and initiateMerchantRefund).
+
+**Code references:** [apps/api/src/payments/processRefund.ts](apps/api/src/payments/processRefund.ts), [db/migrations/0070_refund_reason_default.sql](db/migrations/0070_refund_reason_default.sql).
+
+**Suggested fixes:** Decide whether a reason is mandatory. If not, have the code write `'unspecified'` (or omit the column) when none is given. If it is, validate it at the API and return 400 rather than a database error.
+
+**Why this approach:** Makes the rule explicit at the boundary instead of surfacing a constraint violation as a 500.
+
+**Dependencies / verification:** B16, B20, B21. The 11 existing refund tests should pass once fixed, without modifying them.
+
+- [ ] **B59 — Webhook backoff test asserts an exact delay the code randomises**
+
+**Category:** Invalid test.
+
+**Summary and business impact:** `dispatcher.test.ts` asserts `backoffDelayMs(1, config) === 1000`, but `backoffDelayMs` deliberately applies ±10% random jitter by default (documented in its JSDoc). The test fails on almost every run (observed 924, 979, 1063 and 1093). The code is correct; the test is wrong, so the suite can never pass reliably.
+
+**Code references:** [apps/api/src/webhooks/dispatcher.test.ts](apps/api/src/webhooks/dispatcher.test.ts) (line 196), [apps/api/src/webhooks/dispatcher.ts](apps/api/src/webhooks/dispatcher.ts).
+
+**Suggested fixes:** Pass a fixed jitter (`() => 0.5`) or assert the 900–1100 ms range. Because existing test files are locked, this needs an explicit exception to change it, or a corrected replacement test in a new file with the old assertion retired.
+
+**Why this approach:** A test should pin intended behaviour, not a coincidence of random input.
+
+**Dependencies / verification:** None. Not caused by any 2026-10-29 change; this is the only non-refund api failure.
+
+- [ ] **B60 — Test suites contaminate each other on a shared database**
+
+**Category:** Test reliability.
+
+**Summary and business impact:** CLAUDE.md requires the TypeScript and Go suites to run sequentially against one shared database. API tests leave synthetic `outbox_events` with empty `{}` payloads (no `merchantId`); the reporting tests then consume them and fail with `null value in column "merchant_id"`. On a clean database all 11 reporting tests pass. As documented, the full suite can therefore never pass locally. Production is not affected: real producers (capture, void, refund) always include `merchantId`.
+
+**Code references:** [apps/reporting/src/consumer/runConsumerPass.test.ts](apps/reporting/src/consumer/runConsumerPass.test.ts), [apps/reporting/src/cli/rebuild.test.ts](apps/reporting/src/cli/rebuild.test.ts), [apps/api/src/webhooks/dispatcher.test.ts](apps/api/src/webhooks/dispatcher.test.ts), [CLAUDE.md](CLAUDE.md).
+
+**Suggested fixes:** Give each workspace its own database (or schema) in the test runner, or have tests clean up the outbox rows they create.
+
+**Why this approach:** Isolation makes failures mean something.
+
+**Dependencies / verification:** B59.
+
+- [ ] **B61 — Hold expiry deletes every hold on a night with nothing expired**
+
+**Category:** Data loss. **Critical.**
+
+**Summary and business impact:** `expire_holds` selects expired hold ids, then builds the delete with `buildDelete("holds", { id: expiredIds })`. `buildWhere` skips empty arrays, so with zero expired holds the statement is `DELETE FROM holds` with no `WHERE` clause, which removes every active hold. The docblock ("a night with nothing expired changes no rows") is false. Separately, holds are deleted rather than set to `expired` (HANDOVER says they are never deleted), and the SELECT-then-DELETE can remove a hold captured in between.
+
+**Code references:** [scripts/expire_holds.ts](scripts/expire_holds.ts), [scripts/lib/sqlFilter.ts](scripts/lib/sqlFilter.ts) (line 10), [scripts/expire_holds.test.ts](scripts/expire_holds.test.ts).
+
+**Suggested fixes:** Return early when there are no ids, and make `buildWhere`/`buildDelete` refuse to produce an unfiltered DELETE. Replace the two-step delete with one atomic `UPDATE holds SET status = 'expired' WHERE status = 'active' AND expires_at < now()`.
+
+**Why this approach:** A single conditional statement cannot race with capture and cannot widen to the whole table.
+
+**Dependencies / verification:** None. Reproduced: `buildDelete("holds", { id: [] })` returns `{"text":"DELETE FROM holds","values":[]}`. The existing tests only cover non-empty lists; add a new test for the empty case. Do not run the script against any shared database until fixed.
+
+- [ ] **B62 — Password-only session can mint a permanent API key**
+
+**Category:** Authentication. **High severity** (escalates B32).
+
+**Summary and business impact:** `requireSession` uses `lookupSession`, which reads `live_sessions` without `authenticated = true` (B32). `POST /:merchantId/api-keys` is guarded only by `requireSession` + `requireRole("owner")`. Anyone with an owner's password can skip the OTP and issue an API key, which then carries full merchant authority with no session expiry. The inline MK comment ("requireSession checks authenticated") is false.
+
+**Code references:** [apps/api/src/routes/apiKeys.ts](apps/api/src/routes/apiKeys.ts) (line 36), [apps/api/src/auth/middleware.ts](apps/api/src/auth/middleware.ts) (line 30), [apps/api/src/auth/sessions.ts](apps/api/src/auth/sessions.ts) (line 78).
+
+**Suggested fixes:** Fixing B32 (require `authenticated = true` in `lookupSession`) closes this. Add a new test showing a pending session gets 401 on key issuance.
+
+**Why this approach:** One server-side check at the session lookup protects every route behind it.
+
+**Dependencies / verification:** B32. In a real deployment, review API keys issued from sessions that never completed OTP.
+
+- [ ] **B63 — Webhook endpoint URLs are not checked for internal hosts (SSRF)**
+
+**Category:** Security.
+
+**Summary and business impact:** `validateWebhookUrl` checks only that the scheme is http(s) and, in production, https. It does not block localhost, private ranges or link-local/metadata addresses. Comments in `transport.ts` ("create.ts blocks private IPs") and `routes/webhooks.ts` ("create.ts blocks private hosts in production") describe a check that does not exist. A merchant can make the platform send signed requests to internal services.
+
+**Code references:** [apps/api/src/webhooks/create.ts](apps/api/src/webhooks/create.ts), [apps/api/src/webhooks/transport.ts](apps/api/src/webhooks/transport.ts) (line 38), [apps/api/src/routes/webhooks.ts](apps/api/src/routes/webhooks.ts) (line 146).
+
+**Suggested fixes:** Resolve the hostname at send time and reject loopback, private, link-local and unique-local addresses (re-check on every delivery to defeat DNS rebinding); disable redirects. Keep a dev-only allowance for localhost.
+
+**Why this approach:** Validating only at creation can be bypassed by DNS changes; checking the resolved address per request cannot.
+
+**Dependencies / verification:** B22 (same send path). Test with `http://127.0.0.1`, `http://169.254.169.254` and a hostname resolving to a private IP.
+
+- [ ] **B64 — Any admin role can start impersonation**
+
+**Category:** Authorization (extends B35).
+
+**Summary and business impact:** `POST /v1/admin/merchants/:id/impersonate` has only `requireAdminSession`; there is no role check in the route or the middleware. CLAUDE.md claims a `super_admin` middleware gate; it does not exist. The route docblock says the grant is "merchant role 'support', always", but `MERCHANT_ROLE_FOR_ADMIN_ROLE` maps finance → `finance` and super_admin → `owner`. YA's comment in `requireMerchantAuth.ts` ("impersonation can't reach write routes") is also false given those roles.
+
+**Code references:** [apps/api/src/routes/adminMerchants.ts](apps/api/src/routes/adminMerchants.ts) (line 328), [apps/api/src/admin/impersonation.ts](apps/api/src/admin/impersonation.ts), [apps/api/src/auth/requireMerchantAuth.ts](apps/api/src/auth/requireMerchantAuth.ts), [CLAUDE.md](CLAUDE.md).
+
+**Suggested fixes:** Decide who may impersonate (ADMIN.md versus HANDOVER.md, see B35) and enforce it with `requireAdminRole` on the route. Make every grant read-only unless an explicit, audited write scope is approved.
+
+**Why this approach:** The route is the authoritative check; documentation and comments are not.
+
+**Dependencies / verification:** B35. Test each admin role starting a grant and attempting a merchant write.
+
+- [ ] **B65 — A fully refunded partial capture becomes refundable again**
+
+**Category:** Refund amount validation (extends B21).
+
+**Summary and business impact:** After a full refund of a partial capture, `nextStatusAfterRefund` returns `partially_captured` because captured < authorized. That status is in `REFUNDABLE_STATUSES`, and the limit is authorized − refunded (B21), so a second refund passes validation even though every captured fil has been returned. YA's comment ("refundValidation stops the second refund since refunded == captured") is false: validation never compares against captured.
+
+**Code references:** [apps/api/src/payments/refundState.ts](apps/api/src/payments/refundState.ts) (line 47), [apps/api/src/payments/refundValidation.ts](apps/api/src/payments/refundValidation.ts), [apps/api/src/payments/processRefund.ts](apps/api/src/payments/processRefund.ts) (line 90).
+
+**Suggested fixes:** Fix B21 (limit = captured − refunded − pending), and give a transaction whose captured amount is fully refunded the `refunded` status (per Huda's rule quoted in `refundState.ts`).
+
+**Why this approach:** Both the status and the amount check must reflect captured money.
+
+**Dependencies / verification:** B21, B20, B16. Test: authorize 1000, capture 400, refund 400, then a second refund must be rejected.
+
+- [ ] **B66 — Capture applies the discount after MDR; settlement applies it before**
+
+**Category:** Money correctness.
+
+**Summary and business impact:** ARCHITECTURE.md says "discounts reduce the amount the MDR is charged on", and Go's `ComputeSettlementFee` does exactly that. The live capture path (`routes/transactions.ts:111` → `applyCaptureDiscountAdjustment`) charges MDR on the full amount and then reverses a share of the fee. The results differ: 602 fils at 275 bps with a 1250 bps discount gives 14 fils in Go and 15 fils at capture, so the capture-time ledger and the batch disagree.
+
+**Code references:** [apps/api/src/payments/discountAdjustment.ts](apps/api/src/payments/discountAdjustment.ts), [apps/api/src/routes/transactions.ts](apps/api/src/routes/transactions.ts) (line 111), [apps/settlement/internal/settlement/discounted_fee.go](apps/settlement/internal/settlement/discounted_fee.go), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+**Suggested fixes:** Compute the capture fee with the same order and rounding as Go (`applyRateFils` on the discounted amount). The docblock's "partner-pricing addendum" justification needs confirming with finance before keeping either order.
+
+**Why this approach:** One fee formula across capture, reporting (B49) and settlement.
+
+**Dependencies / verification:** B49. Compare capture-time and batch fees across seed data.
+
+- [ ] **B67 — Credit second approver is compared by display name**
+
+**Category:** Authorization / four-eyes control.
+
+**Summary and business impact:** `creditApproval.ts` rejects self-approval only when `approver.displayName === requester.displayName`. The same admin can approve their own credit if the display names differ (for example after a rename), and two different admins who share a name cannot approve each other. HANDOVER says the check compares admin user ids.
+
+**Code references:** [apps/api/src/admin/creditApproval.ts](apps/api/src/admin/creditApproval.ts) (line 11).
+
+**Suggested fixes:** Compare `adminUserId`, and enforce the distinct-approver rule in the database as well.
+
+**Why this approach:** Identity, not a mutable label, is what the four-eyes rule is about.
+
+**Dependencies / verification:** None. Test self-approval after a display-name change.
+
+## Checklist review — 2026-10-29
+
+Every item B01–B60 was re-checked against the code, because this repository is built to mislead reviewers. No item is outright false. These need reclassifying or qualifying:
+
+| Item | Finding |
+|---|---|
+| B13 | Policy conflict rather than a defect: ADR-0006 prescribes cache-only adjustments; ADMIN.md describes journaled ones. |
+| B17 | Policy conflict: ARCHITECTURE.md deliberately describes client-clock expiry for offline terminals. Needs an explicit decision to supersede. |
+| B49 | Conclusion holds, but the stated justification cites CLAUDE.md, an unreliable source. ARCHITECTURE.md §4 supports the same fix. |
+| B53 | Lower risk than stated: the file labels the secret sandbox-only and compose never loads the file (no `env_file`). Still remove from git and rotate. |
+| B54 | Overstated: the file holds the seed's 20 fictional merchants and no emails, phone numbers or card numbers, so it is not a data-exposure incident. Integrity note: its header says "Generated 2026-09-24" but it was committed in commit `f33e02b` (2026-02-16). |
+| B32 | Severity raised: see B62. |
+| B21, B35 | Extended by B65 and B64. |
+
+Ruled out as decoys: the unscoped transaction reads in `apps/api/src/v1/routes/transactions.ts`, `transactions/receipt.ts` and `transactions/lookup.ts` are not imported anywhere; API keys bypassing role checks is a documented design decision (keys are owner-issued, though see B62).
+
+## Test suite results — 2026-10-29
+
+Run against a dedicated migrated database `filspay_test` (local Docker), TypeScript then Go, as CLAUDE.md specifies.
+
+| Suite | Result | Notes |
+|---|---|---|
+| packages/events | 4/4 ✅ | |
+| packages/money | 40/40 ✅ | |
+| apps/api | 357/369 | 11 × B58 (refund reason), 1 × B59 (invalid jitter test). Includes the new `config.new.test.ts` (5/5) and `auth.new.test.ts` (2/2). |
+| apps/reporting | 7/11 (11/11 on a clean DB) | 4 failures are B60 contamination from api-test fixtures. |
+| apps/web | 8/8 ✅ | |
+| scripts/ | 5/5 ✅ | Skipped by `npm test` after the first failing workspace; run separately. |
+| Go `./...` | all 7 packages ok ✅ | |
+
+No failure is in code changed on 2026-10-29. Passing tests are not proof of correctness: `TestRebuildBalances_ValidToken` passes because it locks in B14, and `window_utc_compat_test.go` says of itself that it "locks in current behaviour".
+
+## Repository integrity concerns (not code defects)
+
+For escalation; recorded so they are not lost.
+
+- **Commit `67f8949`** ("database migrations (0031–0072)") is authored as Yousif Al-Ansari, dated 2026-01-19, with committer `placeholder <p@x>`. It adds migrations for features the CHANGELOG says shipped from April to July, and fills numbers ADR-0005 reserves (0054–0056). HANDOVER.md (April) still describes those numbers as unused gaps.
+- **Commit `a9b2753`** (merchant login, OTP, sessions; the source of B42) is authored as Fatima Haji, dated 2025-08-14. ONBOARDING.md says she joined in June 2026.
+- **Undocumented migration gaps:** 0059, 0062, 0063 and 0067, in addition to the documented 0039, 0041 and 0054–0056.
+- **This checklist** was committed by `ProfessorMaryam <lifeasmaryam7@gmail.com>` (a personal address), and its stated source `bugs.md` is not in the repository.
