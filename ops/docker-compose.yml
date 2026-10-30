@@ -13,7 +13,7 @@
 # missing for you, pull main again.
 #
 # Run from the repo root: `docker compose -f ops/docker-compose.yml up`.
-version: "1.0"
+version: "3.3"
 
 services:
   postgres:
