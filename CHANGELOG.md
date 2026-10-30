@@ -7,10 +7,22 @@ it. Format loosely follows Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- Optional monitoring overlay (`ops/docker-compose.observability.yml`): Prometheus,
+  Grafana, alert rules with runbooks, and infrastructure, services and business
+  health dashboards. `api` and `settlement` serve `/metrics` on a separate port
+  only when `METRICS_PORT` is set. Includes the FP-205 alert on payment links with
+  more than one capture. Alerts show in Grafana only. See
+  `ops/observability/README.md`.
+- Merchant dashboard redesign: sidebar shell, a new overview hub (which is now
+  the landing page) and a transactions ledger with an inspect drawer, CSV export
+  and auto-refresh. Quests are computed from the merchant's own activity and do
+  not affect fees or payouts. Fonts are bundled, not loaded from a CDN.
 - Swagger UI at `/v1/docs`, from a hand-written OpenAPI spec that a test keeps
   in step with the registered routes.
 - Postman collection at `docs/api/filspay.postman_collection.json`, generated
   from that spec, with scripts that carry OTPs, keys and ids between requests.
+- `OTP_OVERRIDE_CODE` and `ADMIN_OTP_OVERRIDE_CODE`: optional fixed OTP codes for
+  testing. Unset by default; the API refuses to boot with them in production.
 - Rate limiting backed by Postgres (migration 0097). Over budget returns `429`
   `rate_limited` with `Retry-After`. Stricter budgets on login, OTP, signup,
   hosted checkout, CSV export and webhook test sends.

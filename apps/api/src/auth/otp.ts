@@ -24,6 +24,14 @@ export function verifyOtpCode(inputCode: string, salt: string, expectedHash: str
   return timingSafeEqualHex(hashOtpCode(inputCode, salt), expectedHash);
 }
 
+/** Constant-time match against a configured test override. Always false when
+ *  none is set, and loadConfig refuses to boot production with one. */
+export function matchesOtpOverride(inputCode: unknown, override: string | undefined): boolean {
+  if (!override || typeof inputCode !== "string") return false;
+  const digest = (value: string): string => createHash("sha256").update(value).digest("hex");
+  return timingSafeEqualHex(digest(inputCode), digest(override));
+}
+
 export interface IssuedOtpChallenge {
   id: string;
   code: string;

@@ -286,7 +286,12 @@ export interface WebhookDispatcherHandle {
  * buildApp() never incidentally start a live background LISTEN session or
  * timer.
  */
-export function startWebhookDispatcher(pool: Pool, transport: WebhookTransport, config: Config): WebhookDispatcherHandle {
+export function startWebhookDispatcher(
+  pool: Pool,
+  transport: WebhookTransport,
+  config: Config,
+  onPassSucceeded?: () => void,
+): WebhookDispatcherHandle {
   let running = false;
   let stopped = false;
 
@@ -294,6 +299,7 @@ export function startWebhookDispatcher(pool: Pool, transport: WebhookTransport, 
     if (running || stopped) return;
     running = true;
     runDispatchPass(pool, transport, config)
+      .then(() => onPassSucceeded?.())
       .catch((err: unknown) => {
         // A thrown error from one pass must never crash the listener or
         // the process — the next NOTIFY or poll tick simply tries again.

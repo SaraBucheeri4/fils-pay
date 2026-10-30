@@ -33,3 +33,17 @@ verification. Both messages used random smoke codes unconnected to any account.
 Full password/OTP verification, expiry/resend and delivery-error route checks
 still require a migrated disposable database. Never enable hosted production
 solely from this smoke check.
+
+## Test override codes
+
+`OTP_OVERRIDE_CODE` (merchant) and `ADMIN_OTP_OVERRIDE_CODE` (admin) set a fixed
+code that OTP verify accepts alongside the emailed one, so tests and demos don't
+depend on an inbox. Both are unset by default and must be at least 6 characters.
+
+Only the OTP step changes: the password, code expiry, attempt limit and rate
+limits all still apply, and each use is logged as a warning. The API refuses to
+boot with either set under `NODE_ENV=production`.
+
+A box running `NODE_ENV=development` still honours them, so on a public host
+anyone with a password and the code can log in. Use a long random value
+(`openssl rand -hex 16`), never commit it, and unset it after testing.

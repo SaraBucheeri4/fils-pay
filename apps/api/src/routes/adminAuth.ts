@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { verifyPassword } from "../adminAuth/passwords.js";
-import { issueAdminChallenge, verifyOtpCode } from "../adminAuth/otp.js";
+import { issueAdminChallenge, matchesOtpOverride, verifyOtpCode } from "../adminAuth/otp.js";
 import { sendAdminOtpCode } from "../adminAuth/notifier.js";
 import { requireAdminSession } from "../adminAuth/middleware.js";
 import {
@@ -150,7 +150,11 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
       throw new TooManyRequestsError("too_many_attempts");
     }
 
-    const matches = verifyOtpCode(code, challenge.code_salt, challenge.code_hash);
+    const overridden = matchesOtpOverride(code, app.config.adminOtpOverrideCode);
+    if (overridden) {
+      request.log.warn({ adminUserId: pending.adminUserId }, "ADMIN_OTP_OVERRIDE_CODE used for login");
+    }
+    const matches = overridden || verifyOtpCode(code, challenge.code_salt, challenge.code_hash);
     if (!matches) {
       await app.db.query(
         `UPDATE admin_otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1`,

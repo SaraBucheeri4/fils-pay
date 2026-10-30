@@ -1,0 +1,44 @@
+# Alerts show in Grafana only; nothing sends notifications. Each `runbook`
+# names a section of ops/observability/README.md.
+groups:
+  - name: infrastructure
+    rules:
+      - alert: PostgresDown
+        # /readyz only checks the database at boot, so it stays green here.
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: The Postgres exporter cannot reach the database
+          runbook: "ops/observability/README.md#postgresdown"
+
+      - alert: MonitoringTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Prometheus cannot scrape {{ $labels.job }}"
+          runbook: "ops/observability/README.md#monitoringtargetdown"
+
+      - alert: PostgresConnectionsNearLimit
+        expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Postgres is using over 80% of its connections
+          runbook: "ops/observability/README.md#postgresconnectionsnearlimit"
+
+      - alert: HostDiskLow
+        # A Linux server reports /; Docker Desktop's VM only reports /var/lib/docker.
+        expr: >-
+          min(node_filesystem_avail_bytes{mountpoint=~"/|/var/lib/docker"}
+          / node_filesystem_size_bytes{mountpoint=~"/|/var/lib/docker"}) < 0.15
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Under 15% of the host's disk is free
+          runbook: "ops/observability/README.md#hostdisklow"

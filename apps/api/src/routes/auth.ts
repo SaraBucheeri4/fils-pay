@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { verifyPassword } from "../auth/passwords.js";
-import { issueChallenge, verifyOtpCode } from "../auth/otp.js";
+import { issueChallenge, matchesOtpOverride, verifyOtpCode } from "../auth/otp.js";
 import { requireMerchantAuth } from "../auth/requireMerchantAuth.js";
 import { sendOtpCode } from "../auth/notifier.js";
 import {
@@ -163,7 +163,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         throw new TooManyRequestsError("too_many_attempts");
       }
 
-      const matches = verifyOtpCode(code, challenge.code_salt, challenge.code_hash);
+      const overridden = matchesOtpOverride(code, app.config.otpOverrideCode);
+      if (overridden) {
+        request.log.warn({ merchantUserId: pending.merchantUserId }, "OTP_OVERRIDE_CODE used for login");
+      }
+      const matches = overridden || verifyOtpCode(code, challenge.code_salt, challenge.code_hash);
       if (!matches) {
         await app.db.query(`UPDATE otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1`, [
           challenge.id,
