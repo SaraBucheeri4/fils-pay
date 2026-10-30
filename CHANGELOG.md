@@ -6,6 +6,20 @@ it. Format loosely follows Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+- Swagger UI at `/v1/docs`, from a hand-written OpenAPI spec that a test keeps
+  in step with the registered routes.
+- Postman collection at `docs/api/filspay.postman_collection.json`, generated
+  from that spec, with scripts that carry OTPs, keys and ids between requests.
+- Rate limiting backed by Postgres (migration 0097). Over budget returns `429`
+  `rate_limited` with `Retry-After`. Stricter budgets on login, OTP, signup,
+  hosted checkout, CSV export and webhook test sends.
+
+### Changed
+- The API now trusts `X-Forwarded-For` from private addresses (`TRUST_PROXY`),
+  and the dashboards' Vite proxies send it, so `request.ip`, including the IP
+  stored on sessions, is the real client rather than the proxy.
+
 ### Fixed
 - Deliver merchant/admin OTPs through Resend with controlled delivery errors
   and server-side temporary inbox routing; prevent production code disclosure.

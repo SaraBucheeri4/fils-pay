@@ -5,6 +5,8 @@ import { createAcquirerSimulator } from "./acquirer/simulator.js";
 import { cookiesPlugin } from "./plugins/cookies.js";
 import { multipartPlugin } from "./plugins/multipart.js";
 import { errorHandler } from "./plugins/errorHandler.js";
+import { apiDocsPlugin } from "./plugins/apiDocs.js";
+import { createPostgresRateLimitStore, rateLimitPlugin, type RateLimitStore } from "./plugins/rateLimit.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessProfileRoutes } from "./routes/businessProfile.js";
@@ -30,6 +32,8 @@ export interface BuildAppOptions {
    *  the dispatcher runs on; index.ts passes its own instance in so one
    *  process has exactly one transport. Tests inject a stub. */
   webhookTransport?: WebhookTransport;
+  /** Where rate-limit counters live. Defaults to Postgres; tests inject one. */
+  rateLimitStore?: RateLimitStore;
 }
 
 /**
@@ -39,7 +43,7 @@ export interface BuildAppOptions {
  * tests use `app.inject(...)` against this — no real socket needed.
  */
 export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, trustProxy: config.trustProxy });
 
   app.decorate("db", pool);
   app.decorate("config", config);
@@ -49,6 +53,12 @@ export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = 
   app.register(cookiesPlugin);
   app.register(multipartPlugin, { config });
   app.setErrorHandler(errorHandler);
+  // Before every route: it attaches limits as routes are registered.
+  app.register(rateLimitPlugin, {
+    config,
+    store: options.rateLimitStore ?? createPostgresRateLimitStore(pool),
+  });
+  app.register(apiDocsPlugin, { config });
 
   app.register(healthRoutes); // unauthenticated, unprefixed
   app.register(authRoutes, { prefix: "/v1/auth" });

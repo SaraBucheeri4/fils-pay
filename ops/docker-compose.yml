@@ -98,6 +98,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       OTP_EMAIL_FROM: ${OTP_EMAIL_FROM:-FilsPay <onboarding@resend.dev>}
       OTP_EMAIL_TO_OVERRIDE: ${OTP_EMAIL_TO_OVERRIDE:-}
+      # Set false only for a load test; see ops/README.md, "Rate limiting".
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      # Adds admin routes to the /v1/docs page. Off so it isn't a public map.
+      API_DOCS_INCLUDE_INTERNAL: ${API_DOCS_INCLUDE_INTERNAL:-false}
     volumes:
       - filspay_kyc:/app/data/kyc
     # Wait for the schema, and for the seed when the seed profile is on.

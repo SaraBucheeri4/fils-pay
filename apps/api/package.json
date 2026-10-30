@@ -10,10 +10,12 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@filspay/events": "*",
-    "@filspay/money": "*",
     "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "^10.1.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "@filspay/events": "*",
+    "@filspay/money": "*",
     "argon2": "^0.45.1",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
@@ -26,7 +28,7 @@
   "devDependencies": {
     "@types/node": "^24.5.2",
     "@types/pg": "^8.11.6",
-    "typescript": "^5.6.3",
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
   }
 }

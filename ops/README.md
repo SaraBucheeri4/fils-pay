@@ -91,6 +91,34 @@ Merchant webhook secrets are encrypted at rest with AES-256-GCM, so
   Keep it in the host's secret store, not in this repo. Rotating it makes
   existing encrypted webhook secrets unreadable, so plan a re-encryption first.
 
+## API docs
+
+- Swagger UI: `/v1/docs` on the API, or through either dashboard's port. The
+  spec itself is at `/v1/docs/json`.
+- Postman: import `docs/api/filspay.postman_collection.json`. After changing
+  `apps/api/src/docs/openapi.ts`, run `npm run postman`; a test fails if the
+  spec, the routes and the collection disagree.
+- `API_DOCS_ENABLED=false` removes the page. `API_DOCS_INCLUDE_INTERNAL=true`
+  adds the admin routes to it. The Postman collection always includes them.
+
+## Rate limiting
+
+Budgets are in `apps/api/src/plugins/rateLimit.ts` and counters in the
+`rate_limit_counters` table, so they hold across restarts and API instances.
+If that table can't be reached, requests are allowed and an error is logged.
+
+| Setting | Default | |
+| --- | --- | --- |
+| `RATE_LIMIT_ENABLED` | `true` (`false` under `NODE_ENV=test`) | Set `false` for load tests |
+| `RATE_LIMIT_DEFAULT_PER_MINUTE` | `600` | Per IP, on routes with no stricter rule |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Who may set `X-Forwarded-For`; `false` trusts no one |
+
+Per-IP limits are only as good as the client IP the API sees. Requests from a
+trusted address may name any client in `X-Forwarded-For`, so don't expose the
+API port on a network where the host's Docker setup rewrites public client
+addresses to a private one. Check with a request from outside: the API log's
+`remoteAddress` should show the real public address.
+
 ## Resource sizing
 
 The hosted demo box is 0.5 vCPU / 2 GB RAM / 2 GB disk; the API container is

@@ -124,6 +124,23 @@ export interface Config {
   acquirerCallbackSigningSecret: string;
   /** Legacy setting; callback verification is mandatory regardless of this value. */
   acquirerCallbackRequireSignature: boolean;
+
+  /** Off by default under NODE_ENV=test only, where suites log in repeatedly
+   *  from one address. The per-route budgets live in plugins/rateLimit.ts. */
+  rateLimitEnabled: boolean;
+  /** Per-IP budget for any route without a stricter rule of its own. */
+  rateLimitDefaultPerMinute: number;
+  /** Which proxies may set X-Forwarded-For, in Fastify's `trustProxy` format.
+   *  Per-IP limits depend on this: with no trusted proxy, every dashboard user
+   *  behind the Vite proxy looks like one client. Private ranges by default,
+   *  which covers the compose network; set "false" to trust no proxy. */
+  trustProxy: string | boolean;
+
+  /** Serves Swagger UI at /v1/docs. */
+  apiDocsEnabled: boolean;
+  /** Adds the admin plane and acquirer callback to the served docs. Off by
+   *  default so a public docs page isn't a map of the operator surface. */
+  apiDocsIncludeInternal: boolean;
 }
 
 function parseNodeEnv(value: string | undefined): Config["nodeEnv"] {
@@ -154,6 +171,12 @@ function parseFloatEnv(value: string | undefined, fallback: number): number {
 function parseBoolEnv(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === "") return fallback;
   return value === "true" || value === "1";
+}
+
+function parseTrustProxy(value: string | undefined): string | boolean {
+  if (value === undefined || value === "") return "loopback,linklocal,uniquelocal";
+  if (value === "false" || value === "0") return false;
+  return value;
 }
 
 /** Used only when NODE_ENV is explicitly "development" or "test" and no key
@@ -274,5 +297,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
     acquirerCallbackSigningSecret,
     acquirerCallbackRequireSignature: parseBoolEnv(env.ACQUIRER_CALLBACK_REQUIRE_SIGNATURE, false),
+
+    rateLimitEnabled: parseBoolEnv(env.RATE_LIMIT_ENABLED, nodeEnv !== "test"),
+    rateLimitDefaultPerMinute: parseIntEnv(env.RATE_LIMIT_DEFAULT_PER_MINUTE, 600),
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
+
+    apiDocsEnabled: parseBoolEnv(env.API_DOCS_ENABLED, true),
+    apiDocsIncludeInternal: parseBoolEnv(env.API_DOCS_INCLUDE_INTERNAL, false),
   };
 }
