@@ -10,8 +10,6 @@ import { decodeEncryptionKey, encryptSecret } from "./secretCrypto.js";
  * (http is permitted otherwise so a local http.createServer test receiver
  * and a merchant's own localhost dev setup both work).
  */
-// MK: https-only in prod is our SSRF protection
-// used to block localhost in dev too, removed for the local receiver — am
 export function validateWebhookUrl(rawUrl: string, config: Pick<Config, "nodeEnv">): URL {
   let parsed: URL;
   try {

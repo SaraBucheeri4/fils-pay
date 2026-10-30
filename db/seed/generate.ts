@@ -207,8 +207,6 @@ export async function generate(pool: Pool): Promise<SeedSummary> {
   try {
     await client.query("BEGIN");
     try {
-      // AM: only touches the fixture tables listed in TABLES_TO_RESET, so it's
-      // safe to run against a shared/staging database. (see RUNBOOK)
       await client.query(`TRUNCATE TABLE ${TABLES_TO_RESET.join(", ")} RESTART IDENTITY CASCADE`);
 
       // Admin staff fixtures. Ids come from the database's own

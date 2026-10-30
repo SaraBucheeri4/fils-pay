@@ -17,8 +17,7 @@ import (
 // recalculation pass.
 //
 // DiffFils is NewFeeFils - OldFeeFils. A positive diff means the merchant was
-// undercharged at close; the correcting ledger group lands in the current
-// period's batch, so the original batch's figures stay as they were paid.
+// undercharged at close. The implementation updates historical batch figures (B28).
 type BatchAdjustment struct {
 	BatchID    uuid.UUID
 	BatchDate  time.Time
@@ -101,7 +100,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 			continue
 		}
 		newNetPayout := b.grossFils - newFee
-		// am: posts against the OLD batch id so it never lands in a new payout?? fixed in FP-244 i think
+		// This still targets the historical batch; paid-history handling is tracked in B28.
 		if err := postMdrAdjustment(ctx, tx, merchantID, b.id, diff); err != nil {
 			return RecalcResult{}, err
 		}
@@ -179,7 +178,6 @@ func postMdrAdjustment(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.
 		magnitude = -magnitude
 	}
 
-	// YA 2026-01-20: a fee decrease still debits merchant_payable here, same as an increase, the sign is in the amount
 	debitAccount, creditAccount := "merchant_payable", "platform_fee_revenue"
 	if diff < 0 {
 		debitAccount, creditAccount = "platform_fee_revenue", "merchant_payable"

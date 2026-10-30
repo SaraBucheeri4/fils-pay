@@ -88,7 +88,6 @@ const MERCHANT_ROLE_FOR_ADMIN_ROLE: Record<AdminUserRole, ImpersonationMerchantR
   super_admin: "owner",
 };
 
-/** @property merchantRole Always "support" (ARCH §8): a grant is view-only. */
 export interface ImpersonationGrantLookup {
   grantId: string;
   adminUserId: string;

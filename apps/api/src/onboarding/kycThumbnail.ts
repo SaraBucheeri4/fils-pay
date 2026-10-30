@@ -27,7 +27,6 @@ export async function generateKycThumbnail(
   if (detectedType !== "jpeg" && detectedType !== "png") {
     return null;
   }
-  // YA: the 8 MiB upload cap protects us here
   const resized = await sharp(buffer)
     .resize(THUMBNAIL_MAX_DIMENSION_PX, THUMBNAIL_MAX_DIMENSION_PX, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 70 })

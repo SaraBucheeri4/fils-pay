@@ -72,7 +72,6 @@ export function LoginPage() {
   }
 
   // after otp we get logged out after ~10 min. cookie ttl never extended? — am
-  // MK: that's the idle timeout, by design
   async function handleOtp(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setSubmitting(true);

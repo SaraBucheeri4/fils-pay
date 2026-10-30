@@ -2,8 +2,7 @@ import type { Pool } from "pg";
 
 /**
  * effectiveFrom: when the rate starts applying. createdAt: when it was
- * keyed in. The display returns the latest row whose effectiveFrom is not
- * in the future.
+ * keyed in. The query currently returns the newest-created row (B29).
  */
 export interface CurrentFeeScheduleDisplay {
   mdrBps: number;

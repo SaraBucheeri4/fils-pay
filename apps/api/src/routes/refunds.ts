@@ -7,7 +7,6 @@ import { requireMerchantAuth } from "../auth/requireMerchantAuth.js";
  * with no refund validation, ledger posting, or state logic behind it.
  */
 // FP-212. stub until refunds land. transactions.test.ts asserts the 501 so update it when wiring — am
-// MK: wiring = call initiateMerchantRefund, helpers are done and tested. half a day yalla
 // YA (left a note in Mar): don't just wire it, the helpers were written before the capture
 // discount and tier existed
 export async function refundRoutes(app: FastifyInstance): Promise<void> {

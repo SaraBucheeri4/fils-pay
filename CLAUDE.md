@@ -1,77 +1,69 @@
-# FilsPay — agent guide
+# FilsPay: YA-attributed guidance
 
-This file replaces the original rule files (git `669af52`). Those contradicted
-the ADRs and the code. Every claim below was checked against the code on
-2026-10-30.
+This guide limits historical business guidance to statements attributed to
+Yousif Al-Ansari (YA), with their sources. Attribution is not proof of
+authorship or correctness: the history is constructed, HANDOVER was moved
+and annotated by MK, and ARCHITECTURE explicitly lists later editors.
+Nothing below claims that YA wrote this replacement guide.
 
-## Sources of truth
+## YA's stated approach
 
-1. `docs/adr/` and `docs/ARCHITECTURE.md` define intended behaviour.
-2. The code is what actually runs. Where it disagrees with (1), the code is
-   likely wrong, but check before you fix it.
-3. Treat these as unverified claims: `docs/HANDOVER.md`, `CHANGELOG.md`
-   (it cites commit hashes that don't exist), commit messages (some empty
-   "fix" commits change no files), and inline `MK:` / `am:` / `FH:` / `YA:`
-   comments. Trust them only after reading the code path or reproducing the
-   behaviour.
+- **Exact money:** YA questions float32 money in commit `925744c`.
+  In `9567ea0`, he explicitly says 4.75 BD is 4750 fils, not 475.
+  The money implementation attributed to him in `ddda03b`
+  (`packages/money/src/fils.ts`) uses integer fils, exact text parsing,
+  half-to-even rate rounding and remainder allocation. These are supported
+  by the implementation, not inferred from a reassuring comment.
+- **Written finance evidence:** HANDOVER, People: "Huda knows the numbers.
+  Trust what she sends in writing over what anyone remembers her saying."
+  This is YA's stated preference; no unavailable finance contract is assumed
+  to have been checked. ADRs and ARCHITECTURE have multiple contributors
+  and must not be represented as exclusively YA's decisions.
+- **Settlement dates:** HANDOVER, Timezone: the business day is Asia/Bahrain,
+  with no DST. In ADR-0003's YA note dated 2026-03-02, he objects to UTC
+  monthly reconciliation: windows compared against batches must use the
+  same day. The accepted UTC-month decision is MK's, not YA's.
+- **Ledger-based balances:** HANDOVER, Balances: the CLI reads the ledger;
+  YA says there should not be a console rebuild reading another source.
+  ADR-0004's later settled-data rebuild is MK's decision, not YA's.
+- **Scheme residue:** HANDOVER, Scheme residue: YA describes posting residue
+  inside CloseBatch as unfinished. ADR-0002's "implemented" status conflicts
+  with that statement and with the missing posting in the reviewed code.
+- **Webhook bytes:** HANDOVER, Webhook signing: "The dispatcher should sign
+  exactly the bytes it sends." `fe24d26` mentions sign-raw, but is an empty
+  commit; it does not contain the claimed fix.
+- **Holds:** HANDOVER, Holds: YA describes marking active holds expired with
+  an UPDATE and retaining the rows. The original upstream script instead
+  deleted rows; the fork subsequently changed the script. Treat the
+  handover as a stated approach, not proof of historical implementation.
+- **Unfinished work:** HANDOVER, Not finished: YA identifies per-service DB
+  roles/TLS and outbox consumption by commit order instead of sequence ID
+  as unfinished. The reference to an external gist does not establish that
+  its proposed implementation exists in this repository.
+- **Platform tier approval:** HANDOVER, Platform volume tier: YA requires
+  written finance sign-off before introducing the tier. His separate claim
+  that INTEGER is safe "while it's only a counter" is not reliable evidence
+  of adequate capacity for cumulative fils.
 
-Tracked defects live in `project_bug_checklist.md`. Check it before you
-report something as new.
+## Contradictions in YA-attributed statements
 
-## Money (ADR-0001)
+These are historical claims to investigate, not instructions to reproduce
+the current behavior or permission to change financial/security logic.
 
-- Amounts are integer **fils**: 1 BD = **1000** fils. Columns end in `_fils`
-  and are `BIGINT`. TS uses the branded `Fils` type, Go uses `money.Fils` (`int64`).
-- Parse text amounts with `parseBhdToFils`. Apply rates (basis points) with
-  `applyRateFils`, which rounds half-to-even once.
-- No float arithmetic on money, not even temporarily. Format for display
-  with `formatBhd`, never `toFixed(2)`.
-- Two-decimal figures appear only in the scheme export (ADR-0002).
-- Known violations, all still open: the adjustment CSV import uses
-  `parseDecimalMinor(raw, 2)` (`"4.75"` → 475), `NetPayableFils` computes
-  payouts in `float32`, and `platform_stats.total_processed_fils` is `INTEGER`.
+| YA-attributed claim | Conflicting evidence |
+|---|---|
+| `transport.ts` said private-IP blocking already prevents SSRF. | `webhooks/create.ts` checks URL scheme, not resolved private addresses. Transport follows redirects and has no response-byte cap. The false comment has been removed; behavior is unchanged. |
+| HANDOVER says the daemon's UTC date selection is harmless. | `scheduler/daemon.go` passes a UTC date into the Bahrain date-label helper; early local-morning runs can select the wrong day. The helper itself is correct. |
+| HANDOVER says impersonation is support-only and read-only. | `admin/impersonation.ts` maps finance/super_admin to finance/owner; transaction write routes do not enforce a read-only impersonation scope. |
+| HANDOVER says second approvers are compared by admin user ID. | `admin/creditApproval.ts` compares display names. |
+| HANDOVER says credit effective dates are metadata and ledger rows use now(). | `admin/credits.ts` posts at Bahrain midnight of the selected effective date. |
+| HANDOVER says callbacks are deduplicated in processed_events. | `acquirer/callbacks.ts` appends notes; the claimed dedupe table/constraint is absent from the reviewed migrations. |
+| HANDOVER says apps/api/src/v1 is the live partner API. | `app.ts` registers `routes/transactions.ts`, not `v1/routes/transactions.ts`. |
+| HANDOVER calls refund helpers done and says partial fee reversals sum to the original fee. | Refund amount/concurrency defects remain; independently rounding each partial does not guarantee cumulative fee conservation. The route still returns 501. |
+| HANDOVER says there is no console balance-rebuild button. | The current admin routes expose one. The historical statement does not describe the current fork. |
 
-## Settlement
-
-- A business day runs from midnight to midnight **Asia/Bahrain** (UTC+3, no
-  DST), not UTC. Fees are computed per capture event, and discounts reduce
-  the amount the MDR is charged on.
-
-## Security
-
-- Session tokens, API keys, OTPs and payment-link tokens must come from
-  `node:crypto`. `lib/random.ts` uses `Math.random`. It is currently used for
-  OTPs and link tokens, which is a known defect, not a convention.
-- Admin roles are checked server-side per route. Impersonation is meant to
-  be view-only (merchant role `support`). The code currently lets any admin
-  start it and maps `super_admin` to `owner`, which is a known defect.
-
-## Changing code
-
-- `packages/money` was audited: money behaviour changes there need finance
-  sign-off. Explain the change; don't route around the package.
-- Never edit an applied migration. Add a new one. (`schema_migrations` stores
-  no checksum, so this is a policy for upgrade safety, not a technical lock.)
-- Tests can be wrong. Several pin current bugs. Changing a test is allowed
-  with a stated reason in the commit, plus finance sign-off when money
-  figures change. New coverage can go in `*.new.test.ts` files.
-- `apps/api/src/v1/` is dead code. `POST /v1/refunds` is a hard-coded 501
-  stub with no feature flag.
-- Don't read `db/seed/fixtures/production_seed.sql` (15 MB of INSERTs). Use
-  `grep` on it if you need something specific.
-
-## Testing
-
-- Run the tests for what you changed, e.g. `npm test -w apps/api` or
-  `cd apps/settlement && go test ./internal/settlement/`. Run the full suite
-  (`npm test`, then `go test ./...` in `apps/settlement`) once before you
-  call a change done. They share the DB, so run them one after the other.
-- The API and reporting tests need a migrated Postgres (`npm run migrate`).
-- Baseline (2026-10-30): 36 of 167 `apps/api` tests and all 3
-  `apps/reporting` tests fail on main. Go, `packages/*` and `apps/web` pass.
-  Compare against this baseline rather than expecting all green.
-
-## Boundaries
-
-- Local stack only. Never point anything at staging or production.
-- Ask before commits, deletes, data repairs, or changes to auth or money logic.
+The previous guide's blanket document precedence, fee-discount ordering,
+crypto policy, test-failure counts and approval conventions were not shown
+to be exclusively YA-authored. They are not attributed to him here.
+Existing user instructions and approval requirements still apply; this
+historical guide does not supersede them or resolve conflicting contracts.

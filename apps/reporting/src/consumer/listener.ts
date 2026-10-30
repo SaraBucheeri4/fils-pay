@@ -39,7 +39,6 @@ export function startReportingConsumer(pool: Pool, config: ReportingConfig): Rep
   };
 
   // MK: dedicated Client, not from the pool -- LISTEN needs a pinned connection. DO NOT TOUCH
-  // incident 2026-05-14 (missed settlement close): root cause was this client silently losing LISTEN after a pg restart. -- FH
   // am: but the poll covers missed NOTIFYs... and reporting doesn't close batches?? MK: the timeline is in the incident doc. AM: which doc
   const listenClient = new Client({ connectionString: config.databaseUrl });
   let listenClientConnected = false;
@@ -68,7 +67,6 @@ export function startReportingConsumer(pool: Pool, config: ReportingConfig): Rep
       console.error("[reporting/consumer] failed to establish LISTEN connection", err);
     });
 
-  // am: if LISTEN dies the worker stops processing until restart
   const interval = setInterval(triggerPass, config.reportingPollIntervalMs);
 
   return {

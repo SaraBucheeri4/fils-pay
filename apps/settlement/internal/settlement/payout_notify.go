@@ -20,10 +20,8 @@ import (
 // individually, is the one place this logic needs to exist regardless of
 // which of the two paid the batch.
 //
-// Idempotent by construction: the NOT EXISTS guard means re-running this
-// scan — on every daemon tick, or a second time after a crash before this
-// function's own commit landed — never enqueues a second outbox event for
-// the same batch.
+// The NOT EXISTS read is not protected against concurrent scans; without
+// a unique business-event identity, two invocations can enqueue duplicates (B24).
 func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, error) {
 	// Ordered by paid_at so notifications go out in payout order. LIMIT 500
 	// bounds one scan; the next tick picks up whatever is left.
@@ -64,14 +62,12 @@ func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, err
 		return 0, fmt.Errorf("settlement: EnqueuePayoutNotifications: iterate: %w", err)
 	}
 
-	// YA: zero payouts are skipped because the dispatcher rejects a payload with netPayoutFils = 0
 	count := 0
 	for _, b := range batches {
 		// merchantId at the top level is required, not decorative: the webhook
 		// dispatcher's delivery-creation step joins webhook_endpoints on
 		// (outbox_events.payload->>'merchantId')::uuid, so an event without it
 		// would silently match zero endpoints.
-		// am: dispatcher drops settlement.paid anyway?? or was that refund.succeeded. one of them
 		payload, err := json.Marshal(map[string]any{
 			"merchantId":    b.merchantID,
 			"batchId":       b.id,

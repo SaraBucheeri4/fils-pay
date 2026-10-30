@@ -36,7 +36,6 @@ const AdminAuthReactContext = createContext<AdminAuthValue | null>(null);
  * server-side on every request, and this context exists so the UI can show
  * the right screen, not so it can decide what is allowed.
  */
-// admin console memory leak — the impersonation interval is never cleared? — am
 // FH: there's a clearInterval in the cleanup. still leaking though??
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AdminAuthStatus>("loading");

@@ -68,7 +68,6 @@ function groupByMerchant(rows: ResidueRow[]): MerchantResidue[] {
   return [...byMerchant.values()];
 }
 
-// am: re-running is safe, entry_group_id dedupes it
 async function postResidueCorrection(client: Client, merchant: MerchantResidue, now: Date): Promise<void> {
   if (merchant.residueFils <= 0) return;
   const entryGroupId = randomUUID();
@@ -89,7 +88,6 @@ async function main(): Promise<void> {
 
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
-  // FH: the log says 'run at ...+03:00' but toISOString is always Z?? MK: different node version
   const now = new Date();
 
   try {

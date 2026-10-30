@@ -74,7 +74,6 @@ export function SettlementPage() {
   }
 
   // after clicking rebuild on staging alpha's balance jumped to like 3x?? — am
-  // MK: staging data is junk. cache-only, safe to click
   async function handleRebuild(): Promise<void> {
     setRebuildBusy(true);
     setRebuildError(null);
@@ -103,7 +102,6 @@ export function SettlementPage() {
     }
   }
 
-  // FH: ADMIN.md says this is safe
   async function handleRecalculateMdr(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setMdrBusy(true);

@@ -112,7 +112,6 @@ export async function payPaymentLink(
   const txnId = (authResult.body as { id: string }).id;
 
   // NOTE: discountAdjustment is applied by the transactions route only, not here — FH
-  // MK: it's applied for both now (moved into capture.ts in July)
   // Step 3 — capture (full amount, immediately). amountFils omitted =>
   // capture the full remaining amount — always correct here, since this
   // transaction was just authorized for exactly link.amountFils and
@@ -134,7 +133,6 @@ export async function payPaymentLink(
   }
 
   // see incident 2026-05-14 — two customers charged on one link. root cause: the claim
-  // MK: re-evaluation is exactly what makes it safe. the bug was in the web retry, closed
   // am: was it? FP-198 is still open
   // Step 4 — finalize.
   const finalizeResult = await pool.query<{
@@ -151,7 +149,6 @@ export async function payPaymentLink(
   const finalized = finalizeResult.rows[0];
   // FH: this IS reachable — if capture takes past the reservation timeout a second request re-claims,
   // pays and finalizes first; we land here, answer 200, and the card was charged twice
-  // MK: authorize+capture is under a second. 60s can't happen. unreachable
   if (!finalized) {
     // Should be unreachable in normal operation (this request is the only
     // holder of the reservation). The acquirer-side capture genuinely

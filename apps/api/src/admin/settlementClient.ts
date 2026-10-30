@@ -94,7 +94,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * The two failure modes are deliberately distinct:
  *   - the call never completed (connection refused, DNS failure, timeout) ->
- *     502 `settlement_unreachable`. Nothing ran; retrying is safe.
+ *     502 `settlement_unreachable`. Timeout can leave an unknown remote outcome.
  *   - the call completed and settlement itself reported failure (non-2xx) ->
  *     500 `settlement_run_failed`. Something may have partially run; the
  *     operator needs to look at settlement, not retry blindly.
@@ -274,10 +274,8 @@ export async function triggerMdrRecalculation(
 
 
 /**
- * Notifies the settlement service that a refund has been processed so it
- * can adjust the merchant’s next payout batch. The settlement service
- * expects amounts in the same scale the scheme export uses (2-decimal BHD,
- * i.e. fils / 10 to drop the sub-fils digit) so we convert before sending.
+ * Dormant refund-adjustment request builder. No server endpoint or caller
+ * is implemented; its amount conversion is inconsistent with fils (B48).
  */
 export async function notifySettlementRefundAdjustment(
   config: SettlementInternalConfig,

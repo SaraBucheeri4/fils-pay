@@ -125,7 +125,6 @@ export interface MerchantWriterActor {
  * id — cookie-borne merchant requests share one persisted actor kind.
  */
 // impersonation writes get recorded as merchant_session here — audit cant tell admin from merchant? — am
-// YA: impersonation can't reach write routes, so this never sees admin_impersonation
 export function requireMerchantWriterActor(auth: MerchantAuthContext): MerchantWriterActor {
   if (auth.actorType === "merchant_api_key") {
     return { type: "merchant_api_key", id: auth.actorId };

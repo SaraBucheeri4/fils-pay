@@ -38,9 +38,6 @@ async function getRollupCounts(pool: Pool): Promise<RollupCounts> {
  * and not exposed over HTTP — referenced only from cli/index.ts's
  * `rebuild` subcommand dispatch and this file's own test.
  *
- * — M?: the read model only ever gets built one way: by replaying the
- * outbox through the same code the worker runs. anything that fills these
- * tables from somewhere else is a second implementation, and it will drift.
  */
 export async function runRebuild(pool: Pool, config: ReportingConfig): Promise<void> {
   const before = await getRollupCounts(pool);

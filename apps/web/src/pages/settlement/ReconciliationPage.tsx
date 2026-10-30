@@ -26,7 +26,6 @@ function defaultRange(): { from: string; to: string } {
   return { from: day(-30), to: day(1) };
 }
 
-// FH: 'explained: false' only shows when settlement is mid-run, a refresh fixes it
 // YA: gap != 0 is real when a fee schedule changes mid-period
 export function ReconciliationPage() {
   const initial = defaultRange();

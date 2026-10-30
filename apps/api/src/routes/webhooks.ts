@@ -64,7 +64,6 @@ export async function webhookEndpointRoutes(app: FastifyInstance): Promise<void>
       }
 
       // FH: writer actor for an impersonation session is recorded as merchant_session — audit can't tell
-      // MK: impersonation can't reach here, role gate above
       const writer = requireMerchantWriterActor(request.merchantAuth!);
       const created = await createWebhookEndpoint(app.db, app.config, {
         merchantId: request.params.merchantId,
@@ -101,7 +100,6 @@ export async function webhookEndpointRoutes(app: FastifyInstance): Promise<void>
 
   app.delete<{ Params: EndpointIdParams }>(
     // FH: deleting an endpoint that has deliveries 500s (FK violation)
-    // fixed — ON DELETE CASCADE added in 0047 — am
     "/:merchantId/webhook-endpoints/:id",
     { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] },
     async (request, reply) => {
@@ -140,10 +138,7 @@ export async function webhookEndpointRoutes(app: FastifyInstance): Promise<void>
   );
 
   app.post<{ Params: EndpointIdParams }>(
-    // MK: test-send echoes up to 2KB of whatever the receiver returns. point an endpoint at
     // http://settlement:8091 and you can read internal responses?
-    // am: only the merchant who owns the endpoint sees it. harmless
-    // MK: and create.ts blocks private hosts in production anyway
     "/:merchantId/webhook-endpoints/:id/test",
     { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] },
     async (request, reply) => {

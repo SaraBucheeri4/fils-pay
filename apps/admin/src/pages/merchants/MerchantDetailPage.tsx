@@ -112,7 +112,6 @@ export function MerchantDetailPage() {
   }
 
   // FH: this ends up in adjustMerchantBalanceCache (cache only)
-  // MK: it's the journaled one since Sep
   async function handleAdjustBalance(): Promise<void> {
     if (!id) return;
     const deltaFils = Number(adjustDeltaFils.trim());
@@ -194,7 +193,6 @@ export function MerchantDetailPage() {
     }
   }
 
-  // MK: opening the impersonation url in the same browser overwrites fp_sid -> session confusion (FP-198)
   // FH: different cookie names (fp_sid vs fp_impersonation), can't repro
   async function handleImpersonate(): Promise<void> {
     if (!id || !detail) return;

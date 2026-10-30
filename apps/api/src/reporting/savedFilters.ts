@@ -41,9 +41,8 @@ export async function createSavedFilter(
 }
 
 /**
- * Lists a merchant's saved filters, newest first. Scoped by merchant_id;
- * there is no pagination because a merchant is capped at 50 saved filters
- * by a CHECK in the 0061 migration.
+ * Lists a merchant's saved filters, newest first, scoped by merchant_id.
+ * No quota or pagination is currently enforced (B86).
  */
 export async function listSavedFilters(pool: Pool, input: { merchantId: string }): Promise<SavedFilterDto[]> {
   const result = await pool.query<SavedFilterRow>(

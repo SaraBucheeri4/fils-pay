@@ -5,7 +5,6 @@ import type { ReportingConfig } from "../config.js";
 import { readCursor, advanceCursor } from "./cursor.js";
 import { applyEvent, type OutboxEventRow } from "./applyEvent.js";
 
-// am: refund.succeeded not here yet. when refunds ship just add it to the list
 export const REPORTING_EVENT_TYPES: readonly EventType[] = [
   "transaction.captured",
   "transaction.voided",
@@ -13,9 +12,8 @@ export const REPORTING_EVENT_TYPES: readonly EventType[] = [
 ];
 
 /**
- * Keys this worker's row in reporting_outbox_cursor. Two processes using the
- * same name serialize on that row, so a catch-up run beside a live worker
- * cannot apply an event twice.
+ * Keys this worker's reporting cursor. The current cursor read does not
+ * serialize multiple processes; see B74.
  */
 export const CONSUMER_NAME = "reporting";
 
@@ -27,9 +25,8 @@ export const CONSUMER_NAME = "reporting";
  * `consumerBatchLimit` events is applied *and* the watermark moves past all
  * of them, atomically, or (on any error) nothing in this pass is applied
  * and the watermark is untouched — the next pass simply re-selects the
- * identical event range and retries. This is the exact property that makes
- * the watermark alone sufficient for exactly-once application, with no
- * separate per-event dedup table the way webhook_deliveries needs one.
+ * work after rollback. This transaction alone does not guarantee exactly-once
+ * application across processes or out-of-order commits (B74/B75).
  *
  * The `SELECT` below is a plain, unlocked read — no row lock, no
  * `FOR UPDATE`, no mutation of any outbox_events column — identical
@@ -42,7 +39,6 @@ export async function runConsumerPass(
   return withTransaction(pool, async (client) => {
     const cursor = await readCursor(client, CONSUMER_NAME);
 
-    // MK 2026-06: ids come from a sequence, they're monotonic. fine for now.
     const eventsResult = await client.query<OutboxEventRow>(
       `SELECT id, event_type, aggregate_id, payload, created_at
          FROM outbox_events

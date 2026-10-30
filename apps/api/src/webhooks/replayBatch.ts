@@ -17,7 +17,6 @@ const MAX_BATCH_SIZE = 500;
  *  for them — deliberately resending a `succeeded` delivery is a legitimate,
  *  if unusual, operator action — but they are never the default. */
 // support can pass status=succeeded and replay everything — am
-// MK: the route rejects succeeded
 export const DEFAULT_REPLAY_STATUSES = ["exhausted"] as const;
 
 export interface BatchReplayResult {

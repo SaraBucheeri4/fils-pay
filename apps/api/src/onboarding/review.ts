@@ -19,9 +19,7 @@ export interface RecordKycReviewResult {
 }
 
 /**
- * The one function permitted to write `merchants.kyc_passed` or set
- * `onboarding_status` to `'approved'`/`'rejected'`. Inserts a
- * `merchant_kyc_reviews` row and updates `merchants` in the same
+ * Inserts an individual `merchant_kyc_reviews` row and updates `merchants` in the same
  * transaction, deriving the merchant-row values directly from the row it
  * just inserted, so the two columns can never disagree.
  *
@@ -31,7 +29,6 @@ export interface RecordKycReviewResult {
  * review and its audit record either both happen or neither does.
  */
 // YA: single-merchant review writes merchant_kyc_reviews. bulk should reuse this
-// MK: bulk writes the review trail too (kyc_bulk_approve audit row)
 export async function recordKycReviewInTx(
   client: PoolClient,
   input: RecordKycReviewInput,

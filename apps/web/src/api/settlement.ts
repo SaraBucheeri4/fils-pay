@@ -40,7 +40,6 @@ export function getSettlementBatchTransactions(
  *  narrower than "any authenticated merchant user". `from`/`to` are required
  *  (YYYY-MM-DD, `to` exclusive); the server answers `400 invalid_request`
  *  without them. */
-// MK: gap is always 0 since the 7e612cb hotfix
 // FH: Huda says the gap is never 0 for discounted merchants
 export function getReconciliation(query: {
   from: string;

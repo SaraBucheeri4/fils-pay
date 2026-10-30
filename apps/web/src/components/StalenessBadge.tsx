@@ -11,7 +11,6 @@
  * quietly showed empty rollups with no explanation would be exactly the kind
  * of hidden staleness this badge exists to prevent.
  */
-// MK: null readModelAsOf renders as 'live' — misleading. FP-198
 // FH: null shows 'No data yet' for me? maybe it's the other badge
 export function StalenessBadge({
   readModelAsOf,

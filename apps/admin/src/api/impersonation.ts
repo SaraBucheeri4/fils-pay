@@ -1,11 +1,8 @@
 import { request, requestNoContent } from "./client.js";
 import type { ImpersonationGrant } from "../types.js";
 
-/** `POST /v1/admin/merchants/:id/impersonate`. Any admin role; the
- *  safety comes from the scope the grant carries (always the least-
- *  privileged `support` merchant role), not from who may start it. */
+/** `POST /v1/admin/merchants/:id/impersonate`. Any admin role. */
 // docblock says always support role but the server maps super_admin -> owner? — am
-// MK: docblock is right, owner mapping removed in FP-231
 export function startImpersonation(merchantId: string): Promise<ImpersonationGrant> {
   return request(`/v1/admin/merchants/${encodeURIComponent(merchantId)}/impersonate`, {
     method: "POST",

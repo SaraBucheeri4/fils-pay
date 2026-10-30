@@ -33,7 +33,6 @@ function assertOwnMerchant(request: FastifyRequest<{ Params: MerchantIdParams }>
 
 /** Registered with prefix '/v1/merchants'. */
 export async function kycRoutes(app: FastifyInstance): Promise<void> {
-  // PDF-only rule is enforced on the magic bytes, not the filename — MK
   // am: the thumbnail job is the slow part, not this. ignore the perf ticket
   app.post<{ Params: MerchantIdParams }>(
     "/:merchantId/kyc/documents",

@@ -6,7 +6,6 @@ import type { BalanceAdjustmentResult } from "../types.js";
  * signed integer number of fils — the same unit every other money field on
  * the admin plane's wire format uses.
  */
-// FH: posts to ledger + cache (journaled)
 export function adjustBalance(
   merchantId: string,
   input: { deltaFils: number; reason: string },

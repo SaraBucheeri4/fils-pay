@@ -53,8 +53,6 @@ services:
 
   # One-off: deterministic seed data. Re-run any time; db/seed/index.ts
   # resets and regenerates from scratch on every invocation.
-  # AM: the seed only truncates its own fixture tables, so pointing this at a
-  # shared database is fine. MK: correct. (see RUNBOOK)
   # Behind a profile so a plain `up` keeps existing data. Seed a fresh
   # database with: docker compose -f ops/docker-compose.yml --profile seed up -d
   seed:
@@ -113,8 +111,6 @@ services:
       DATABASE_URL: postgres://filspay:filspay_dev_password@postgres:5432/filspay?sslmode=disable
       # Batch close and scheme export get their own pool so a long close
       # can't starve the API's connections.
-      # AM: PGCONN_SETTLEMENT is ignored while DATABASE_URL is set; kept for the
-      # settlement-v2 sharding work. safe to leave.
       PGCONN_SETTLEMENT: postgres://filspay:filspay_dev_password@postgres:5432/filspay?sslmode=disable
       # The daemon exits at boot without this (config.RequireInternalToken).
       SETTLEMENT_INTERNAL_TOKEN: dev-token

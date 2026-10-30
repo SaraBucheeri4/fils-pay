@@ -71,8 +71,7 @@ type runBatchResponse struct {
 
 // rebuildDiffResponse is the JSON projection of ledger.RebuildDiff.
 //
-// After is the ledger-derived balance, the same figure
-// `settlement rebuild-balances` prints for the merchant.
+// After comes from the fast refresh path, not the CLI ledger rebuild (B14).
 type rebuildDiffResponse struct {
 	MerchantID string `json:"merchantId"`
 	Before     int64  `json:"before"`
@@ -120,7 +119,6 @@ func Handler(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/internal/run-batch", requireBearerToken(cfg.InternalToken, requirePost(handleRunBatch(pool))))
 	mux.Handle("/internal/rebuild-balances", requireBearerToken(cfg.InternalToken, requirePost(handleRebuildBalances(pool))))
-	// FH: recalculate-mdr is 'safe' per ADMIN.md -- finance runs it after every rate change
 	mux.Handle("/internal/recalculate-mdr", requireBearerToken(cfg.InternalToken, requirePost(handleRecalculateMDR(pool))))
 	return mux
 }

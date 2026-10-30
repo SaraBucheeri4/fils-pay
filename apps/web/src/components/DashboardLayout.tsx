@@ -5,10 +5,7 @@ import { RequireRole } from "../auth/RequireRole.js";
 import { describeError } from "../api/client.js";
 import "../dashboard.css";
 
-/** Nav shell for every merchant dashboard screen. No impersonation banner
- *  here — nothing in the merchant plane impersonates anyone; when an admin
- *  "views as merchant", they arrive with a `support`-role session and see
- *  exactly what a support user sees. */
+/** Nav shell for every merchant dashboard screen. */
 export function DashboardLayout() {
   const { me, signOut } = useDashboardAuth();
   const navigate = useNavigate();

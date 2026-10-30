@@ -29,7 +29,6 @@ const STATUS_TABS: Array<{ value: CreditRequestStatus; label: string }> = [
  * route, server-side.
  */
 // approve is gated server side but issuing (MerchantDetail) only in the ui? — am
-// MK: both are server-side
 export function CreditsPage() {
   const [status, setStatus] = useState<CreditRequestStatus>("pending_approval");
   const [items, setItems] = useState<CreditRequestDto[]>([]);

@@ -9,8 +9,8 @@ export interface BulkApproveMerchantsKycInput {
 }
 
 /**
- * @property approvedMerchantIds Only merchants that moved from under_review to approved.
- * Already-approved or rejected ids are skipped and not listed.
+ * @property approvedMerchantIds IDs returned by the bulk update. The query
+ * does not currently filter prior review status or write individual reviews (B85).
  */
 export interface BulkApproveMerchantsKycResult {
   approvedCount: number;

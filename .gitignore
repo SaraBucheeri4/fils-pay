@@ -6,3 +6,5 @@ dist/
 npm-debug.log*
 .DS_Store
 .claude/
+bugs.md
+reports/

@@ -1,18 +1,32 @@
 # FilsPay project bug checklist
 
-Source: [bugs.md](bugs.md). Prepared 2026-10-29. Duplicate reports are consolidated; distinct export problems are split for tracking. All items start unchecked. This is a remediation plan based on source inspection, not proof of runtime reproduction or a complete security audit.
+Prepared 2026-10-29; source-audited 2026-10-30. The originally cited bugs.md is absent and is not supporting evidence. Duplicate reports are consolidated; distinct export problems are split for tracking. This is a remediation plan based on source inspection, not proof of runtime reproduction or a complete security audit.
 
 Mark an item complete only when the fix and its dependent behavior have been verified. Integration decisions are tracked separately from confirmed implementation defects. No production-data repair is authorized by this checklist.
 
-## Status update — 2026-10-29
+## Current source audit - 2026-10-30
+
+- Reviewed original B01-B68 against current source/schema and historical evidence. Old test/reproduction statements are author-reported historical records, not fresh results.
+- Removed from active defects: B07-B09 (integration scope), B13 (explicit display-only policy), B17 (documented client-clock policy), B30 (approximate monitoring), B54 (fixture hygiene, no established data exposure). B65 is consolidated into B21, not an unconditional status-change requirement.
+- B56 is resolved by current guide edits; B57 false checksum assurance is corrected without adding checksums. B03 is repaired code awaiting account-kind approval. B59 remains open because replacement coverage does not retire its original failing test.
+- Qualified B10/B14/B18/B26/B35/B45/B48/B49/B52/B53/B58/B60/B64/B66: removed false authority, unsupported causal/authorship claims and unconditional contract choices. Go's discount order is not established business authority.
+- Added distinct gaps B69-B87. Existing entries cover related SSRF, paid-history, impersonation and approval problems, so those were not duplicated.
+- Comment cleanup changes no executable financial/authentication behavior. No staging/production access or data repair is authorized by this audit.
+- Verification: comment-free TypeScript compiler output is identical in 55 changed TS/TSX files; executable Go tokens are identical in 6 files; Compose non-comment content is unchanged. All 87 checklist IDs occur once. Full npm test attempt hit sandbox spawn EPERM; Go test -short hit denied build-cache access. DATABASE_URL is unset, so no database integration pass is claimed. Logs are in reports/checklist-audit-*-test.log.
+
+## Cleanup scope and protected evidence
+
+Runtime-source comments were corrected without changing executable behavior. Applied migrations, regression-locked tests, frozen money packages and archived narrative records were preserved. Old misleading comments there are historical evidence, not guarantees: SQL claims about64-bit INTEGER, scheme truncation, automatic callback dedupe and paged/compressed archives are disproved by B46/B26/B19/B37. This audit did not rewrite migration bytes or test assertions to hide that evidence.
+
+## Historical status update — 2026-10-29
 
 Verified against a local Docker stack (Postgres 16, all migrations, seed, all services running). Nothing was run against staging or production.
 
 | State | Items |
 |---|---|
-| Resolved and verified | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B58, B59, B61, B62, B68 |
+| Historically reported resolved (not rerun here) | B01, B02, B04, B05, B06, B32, B34, B40, B41, B42, B43, B58, B61, B62, B68 |
 | Fixed, verification or sign-off outstanding | B03 |
-| Confirmed by reproduction, still open | B10, B11, B12, B14, B60 |
+| Historically reported reproduced, not rerun here | B10, B11, B12, B14, B60 |
 | Newly recorded (B40–B60) | see "Additional findings" and "Test suite results" at the end |
 | Found in checklist review (B61–B68) | B61 (critical), B62–B64 and B68 (high), B65–B67; see "Checklist review" for reclassified items |
 
@@ -22,7 +36,7 @@ The source file named above, `bugs.md`, does not exist in this repository or its
 
 - Money amounts must remain whole fils; no floating-point money calculations. Resolve existing decimal input/export contracts explicitly rather than silently changing units.
 - Daily settlement starts at midnight Asia/Bahrain (UTC+3), closing the completed business day.
-- Direct docs/*.md files are the requested source of truth. ADRs guide future changes; conflicting policies are called out below rather than silently resolved.
+- Use executable paths/schema for actual behavior and approved requirements for intended behavior. Cross-check documents and attributed comments; conflicting policies are not automatically defects.
 - Respect existing money-package and test-file freezes. Identify any approval or policy change needed before implementation; a test preserving a bug must not dictate incorrect business behavior.
 - Check migration deployment history before changing existing migration files. Fresh-install and upgrade paths both need validation.
 
@@ -88,9 +102,9 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 - [ ] **B03 — Migration 0055 uses nonexistent account columns**
 
-**Category:** Startup blocker.
+**Category:** Account-classification sign-off; original startup mismatch repaired.
 
-**Summary and business impact:** The migration inserts code, account_type and description into a chart_of_accounts table defined with id, name and kind. Database setup cannot finish.
+**Summary and business impact:** The original insert used nonexistent columns. Current0055 uses id/name/kind and no longer blocks startup for that reason. Finance approval of unused account kinds is outstanding, not an unfixed column bug.
 
 **Code references:** [db/migrations/0055_chart_of_accounts_suspense.sql](db/migrations/0055_chart_of_accounts_suspense.sql), [db/migrations/0007_ledger_double_entry.sql](db/migrations/0007_ledger_double_entry.sql), [db/migrate.ts](db/migrate.ts).
 
@@ -167,48 +181,6 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Manually confirmed in a browser (2026-10-29):** merchant dashboard login with password + OTP as `owner@gammahospitality.example` (transactions list loads, 25 rows, amounts shown in 3-decimal BHD); admin console login as `superadmin@filspay.test` (merchant list loads). Credentialed CORS for a separately hosted api remains unimplemented; it is only needed if the frontends are ever deployed on a different origin from the api.
 
-- [ ] **B07 — Card processing uses only a simulator**
-
-**Category:** Integration decision.
-
-**Summary and business impact:** The API always constructs a simulator; approvals do not represent real card processing. This is a live-launch gap, not necessarily a defect for a demo.
-
-**Code references:** [apps/api/src/app.ts](apps/api/src/app.ts), [apps/api/src/acquirer/simulator.ts](apps/api/src/acquirer/simulator.ts), [apps/api/src/acquirer/types.ts](apps/api/src/acquirer/types.ts).
-
-**Suggested fixes:** Decide whether the target is a demo or live payments. For live use, add a provider adapter with stable idempotency, timeout recovery and callback verification; retain an explicit simulator mode.
-
-**Why this approach:** Keeps demonstrations deterministic and prevents simulated approvals being mistaken for live payments.
-
-**Dependencies / verification:** B17–B23. Requires a provider contract; do not mark live-ready from simulator tests.
-
-- [ ] **B08 — Paid batch status does not represent a confirmed bank transfer**
-
-**Category:** Integration decision.
-
-**Summary and business impact:** Payout code posts ledger entries and marks batches paid without initiating or confirming a bank transfer. The business cannot treat that status as evidence of disbursement.
-
-**Code references:** [apps/settlement/internal/settlement/batch.go](apps/settlement/internal/settlement/batch.go), [apps/settlement/internal/splits/allocate.go](apps/settlement/internal/splits/allocate.go), [apps/settlement/internal/settlement/payout_notify.go](apps/settlement/internal/settlement/payout_notify.go), [apps/api/src/webhooks/payoutDisbursement.ts](apps/api/src/webhooks/payoutDisbursement.ts).
-
-**Suggested fixes:** For live payouts, add a durable payout instruction and provider/manual-confirmation workflow. Mark paid only on authoritative confirmation; make retries and ledger posting idempotent.
-
-**Why this approach:** Separates money owed, transfer requested and transfer completed, preventing false payout confirmations.
-
-**Dependencies / verification:** B11, B24, B25 and B28. Coordinate ledger, status, reports and notifications; demo-only scope must be explicit.
-
-- [ ] **B09 — OTP delivery is a logging stub**
-
-**Category:** Integration gap.
-
-**Summary and business impact:** No real email or SMS delivery exists. In production the code is not logged, so users cannot complete normal OTP login through a delivery channel.
-
-**Code references:** [apps/api/src/auth/notifier.ts](apps/api/src/auth/notifier.ts), [apps/api/src/adminAuth/notifier.ts](apps/api/src/adminAuth/notifier.ts), [apps/api/src/config.ts](apps/api/src/config.ts).
-
-**Suggested fixes:** Add a notifier adapter for the selected delivery provider with bounded retries and delivery-failure handling. Keep development exposure explicitly restricted to development.
-
-**Why this approach:** Makes two-step login usable without leaking production authentication codes into logs.
-
-**Dependencies / verification:** B32 and B33. Test delivery failure, expiry and resend for merchant and admin accounts.
-
 - [ ] **B10 — Settlement does not close at Bahrain midnight**
 
 **Category:** Business timing.
@@ -217,7 +189,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Code references:** [apps/settlement/internal/scheduler/daemon.go](apps/settlement/internal/scheduler/daemon.go), [apps/settlement/internal/settlement/window.go](apps/settlement/internal/settlement/window.go), [apps/settlement/internal/config/config.go](apps/settlement/internal/config/config.go).
 
-**Suggested fixes:** Derive today in Asia/Bahrain, close the completed local day at 00:00 UTC+3, and use inclusive-start/exclusive-end windows. Remove the intentional delay for the requested rule; recover missed days explicitly.
+**Suggested fixes:** Choose the completed date in Asia/Bahrain before constructing the window. Preserve half-open boundaries and recover missed dates. The configured15-minute delay is an explicit scheduling choice; removing it requires an agreed schedule, not this bug fix.
 
 **Why this approach:** Uses one business calendar independent of host timezone and keeps the midnight cutoff exact even when batch processing takes time.
 
@@ -257,29 +229,15 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Status (2026-10-29): confirmed by code path.** `parseAdjustmentAmountFils` calls `parseDecimalMinor(raw)` with its default of 2 decimals, so `"4.75"` (the format ADMIN.md tells finance to use) becomes 475 fils = 0.475 BD, ten times too small.
 
-- [ ] **B13 — Balance adjustments affect only the cache despite journaled documentation**
-
-**Category:** Accounting policy conflict.
-
-**Summary and business impact:** The active adjustment route updates the cached balance and audit log but not the ledger. Corrections disappear on rebuild and disagree with ADMIN.md; ADR 0006 prescribes cache-only behavior.
-
-**Code references:** [apps/api/src/routes/adminBalanceAdjustments.ts](apps/api/src/routes/adminBalanceAdjustments.ts), [apps/api/src/admin/balanceAdjustments.ts](apps/api/src/admin/balanceAdjustments.ts), [apps/api/src/admin/ledgerAdjustments.ts](apps/api/src/admin/ledgerAdjustments.ts), [docs/ADMIN.md](docs/ADMIN.md), [docs/adr/0006-display-adjustments.md](docs/adr/0006-display-adjustments.md).
-
-**Suggested fixes:** Resolve the documented policy conflict. For actual financial corrections, use balanced journal entries with reasons and effective dates, and update the cache consistently. Label any retained display-only corrections explicitly.
-
-**Why this approach:** Distinguishes a financial correction from a visual override and prevents a rebuild from silently undoing real corrections.
-
-**Dependencies / verification:** B14 and B28. Review existing cache adjustments before migration; do not automatically journal all historical display changes.
-
 - [ ] **B14 — Admin and CLI balance rebuilds use different sources**
 
 **Category:** Accounting correctness / policy conflict.
 
-**Summary and business impact:** The CLI sums merchant-payable ledger entries while the admin path reads a scheme-export-based view. The same merchant can receive different balances.
+**Summary and business impact:** The fast path uses a view summing historical scheme gross without subtracting fees or payouts. A fully paid merchant can receive lifetime gross labelled cached payable. Different sources are an ADR-0004 decision; lifetime gross versus unpaid liability is the arithmetic defect.
 
 **Code references:** [apps/settlement/internal/ledger/rebuild.go](apps/settlement/internal/ledger/rebuild.go), [apps/settlement/internal/ledger/refresh.go](apps/settlement/internal/ledger/refresh.go), [apps/settlement/internal/internalapi/server.go](apps/settlement/internal/internalapi/server.go), [db/migrations/0054_views.sql](db/migrations/0054_views.sql), [docs/adr/0004-balance-rebuild-source.md](docs/adr/0004-balance-rebuild-source.md).
 
-**Suggested fixes:** Resolve ADR 0004 versus direct-doc requirements and define one authoritative payable calculation. Reuse the ledger-based calculation for a financial balance; run expensive rebuilds as jobs and protect concurrent updates.
+**Suggested fixes:** Define current payable from actual unpaid liabilities and reconcile against ledger/statements. Different performance strategies must produce the same financial quantity; two implementations alone are not the defect.
 
 **Why this approach:** A shared accounting definition prevents two supposedly equivalent operations producing different financial answers.
 
@@ -317,21 +275,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B20, B21, B22 and B23 before activation; coordinate B28 and B39. Add envelope support before enabling a new dispatcher event type.
 
-- [ ] **B17 — Client timestamps can bypass payment-link expiry**
-
-**Category:** Payment authorization.
-
-**Summary and business impact:** Expiry checking trusts submittedAt from the payer, allowing a backdated request to make an expired link payable.
-
-**Code references:** [apps/api/src/paymentLinks/pay.ts](apps/api/src/paymentLinks/pay.ts), [apps/api/src/routes/paymentLinks.ts](apps/api/src/routes/paymentLinks.ts), [apps/web/src/pages/checkout/CheckoutPage.tsx](apps/web/src/pages/checkout/CheckoutPage.tsx).
-
-**Suggested fixes:** Use server/database time in the atomic claim query. Keep client time as metadata only. Recover previously accepted attempts through durable idempotency rather than a client-controlled clock.
-
-**Why this approach:** The payer cannot choose the clock used to authorize their own payment.
-
-**Dependencies / verification:** B18. ARCHITECTURE.md currently describes client-time expiry; explicitly supersede that policy when implementing this reported defect.
-
-- [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **raised to high: confirmed cause of incident 2026-05-14, still live**
+- [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **high: confirmed code-path race; historical causation not independently established**
 
 **Category:** Duplicate charge.
 
@@ -345,10 +289,10 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B17 and B07. Include crash recovery so the fix does not leave links permanently reserved.
 
-**Evidence (2026-10-30): this is the real cause of incident 2026-05-14, which the postmortem misattributes to B19.**
+**Source evidence (2026-10-30): the race matches the incident narrative; production causation is not independently verified.**
 - [docs/incidents/postmortem-2026-05.md](docs/incidents/postmortem-2026-05.md) says links were "captured more than once" because duplicate acquirer callbacks produced a second capture. Its own timeline records the doubles as "captures are 60–70 s apart".
 - 60 s is exactly `PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS`' default ([config.ts](apps/api/src/config.ts), line 253). The claim in [pay.ts](apps/api/src/paymentLinks/pay.ts) lets a second buyer take a link once `reserved_at` is older than that, while the first buyer's processor call may still be running. Finalize matches only `WHERE id = $1 AND status = 'reserved'`, with no reservation/attempt identity, so it cannot tell whose reservation it is finalizing. Both buyers' captures complete.
-- The callback path cannot produce a capture at all (see B19), so the postmortem's root cause is impossible.
+- The callback path cannot produce a capture at all (see B19), so this snapshot's callback-note handler cannot explain the claimed capture side effect.
 - The June eng sync ([2026-06-02-eng-sync.md](docs/meetings/2026-06-02-eng-sync.md)) shows the real fix, FP-202 ("one successful capture per link", AM), held back because the PR also changed the timeout to 300 s and MK wanted them split, while the callback "dedupe" (FP-201) was reported deployed. It also closes "holds staying active" (postmortem: two Gamma holds stayed `active` after the extra captures) as a duplicate of the callback issue.
 - Nothing in the code has changed since: B18 is still exploitable whenever an acquirer call outlasts the reservation timeout. Raising the timeout (the FP-202 side change) only narrows the window; the fix is the attempt identity and single-capture guarantee described above.
 - Follow-ups: correct the postmortem's root cause (as a dated correction, not a rewrite); re-check the two Gamma holds and the settled extra captures that finance credited.
@@ -374,7 +318,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 - [ ] **B20 — Concurrent refunds can return money twice**
 
-**Category:** Refund concurrency.
+**Category:** Refund concurrency; latent release blocker while the public route returns501.
 
 **Summary and business impact:** Validation and completion occur in separate transactions without reserving refundable funds. Two requests can both use the same available balance.
 
@@ -388,7 +332,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 - [ ] **B21 — Refund limits use authorization instead of captured funds**
 
-**Category:** Refund amount validation.
+**Category:** Refund amount validation; latent release blocker while the public route returns501.
 
 **Summary and business impact:** The helper subtracts refunds from the authorized amount, permitting refunds of money never captured on partially captured transactions.
 
@@ -464,7 +408,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Code references:** [apps/settlement/internal/settlement/scheme_export.go](apps/settlement/internal/settlement/scheme_export.go), [apps/settlement/internal/settlement/batch.go](apps/settlement/internal/settlement/batch.go), [db/migrations/0050_scheme_export_lines_acquirer_amount.sql](db/migrations/0050_scheme_export_lines_acquirer_amount.sql).
 
-**Suggested fixes:** Make the scheme amount authoritative in integer fils and derive all representations from it. Resolve the external decimal-text contract against the user's no-decimals rule before implementation; do not assume an exception.
+**Suggested fixes:** Derive the external decimal representation from one authoritative integer scheme amount. ADR-0002 explicitly permits a two-decimal scheme file. There is no established blanket user ban on decimal text; confirm the acquirer contract before changing that format.
 
 **Why this approach:** One amount shared by export and accounting eliminates inconsistent rounding paths.
 
@@ -511,20 +455,6 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Explains the actual applicable pricing instead of when a staff member entered a schedule.
 
 **Dependencies / verification:** B28. Do not change historical charged rates just to match a previously incorrect display.
-
-- [ ] **B30 — Lifetime payout totals lose whole-fils precision**
-
-**Category:** Monitoring correctness.
-
-**Summary and business impact:** Payout accumulation converts amounts to float32 and stores the total as REAL, losing precision for high-volume merchants.
-
-**Code references:** [apps/settlement/internal/settlement/payout_estimate.go](apps/settlement/internal/settlement/payout_estimate.go), [db/migrations/0040_merchants_lifetime_payout_monitoring_estimate.sql](db/migrations/0040_merchants_lifetime_payout_monitoring_estimate.sql).
-
-**Suggested fixes:** Migrate to a clearly named integer-fils total, use integer accumulation and rebuild from authoritative payout records. Check dependent serializers and reports.
-
-**Why this approach:** Reconstructing from exact source records recovers information that casting an already-rounded float cannot restore.
-
-**Dependencies / verification:** B11, B08 and B28. Treat schema changes as explicit migrations and reconcile before/after totals.
 
 - [ ] **B31 — Status maintenance accidentally activates test merchants**
 
@@ -594,11 +524,11 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Category:** Authorization policy conflict.
 
-**Summary and business impact:** Finance admins become merchant finance users and can write during impersonation, while ADMIN.md reserves impersonated writes for super admins. HANDOVER.md describes all impersonation as read-only.
+**Summary and business impact:** Impersonation lacks an enforced read-only scope. Finance/super_admin map to finance/owner, but even support grants reach capture/void routes that only require authentication. Existing grants also lack an active-admin check. Rendered always-support/read-only promises contradict this code; documents conflict over the intended role policy.
 
 **Code references:** [apps/api/src/admin/impersonation.ts](apps/api/src/admin/impersonation.ts), [apps/api/src/auth/requireMerchantAuth.ts](apps/api/src/auth/requireMerchantAuth.ts), [apps/api/src/routes/adminMerchants.ts](apps/api/src/routes/adminMerchants.ts), [docs/ADMIN.md](docs/ADMIN.md), [docs/HANDOVER.md](docs/HANDOVER.md).
 
-**Suggested fixes:** Resolve the direct-doc conflict. Enforce explicit read-only grants for support/finance under ADMIN.md's policy, permit only approved super-admin write scopes, and validate the originating admin remains active.
+**Suggested fixes:** Agree explicit impersonation scopes, enforce them on each write path, retain truthful admin actor attribution and reject inactive originating admins. Align product copy; mapping to support alone does not make access read-only.
 
 **Why this approach:** Makes permissions depend on an explicit server-enforced grant rather than broad merchant roles or hidden UI buttons.
 
@@ -752,7 +682,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Category:** Reporting correctness (latent).
 
-**Summary and business impact:** `refund_merchant_summary` (0072) joins `transactions t ON t.id = r.id` (the refund's own id) instead of `r.transaction_id`, so it is always empty. Nothing reads it yet.
+**Summary and business impact:** The unused materialized view joins transactions.id to refunds.id instead of refunds.transaction_id. Most rows disappear; coincidentally matching unrelated IDs could associate the wrong transaction. Always empty is too strong. No current reader/refresh path was established.
 
 **Code references:** [db/migrations/0072_refund_merchant_summary.sql](db/migrations/0072_refund_merchant_summary.sql).
 
@@ -794,7 +724,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Category:** Money correctness (latent; not called anywhere today).
 
-**Summary and business impact:** `notifySettlementRefundAdjustment` sends `Math.round(amountFils / 10)` labelled as fils, while `feeReversedFils` in the same payload is sent unscaled. Settlement would deduct a tenth of the refund.
+**Summary and business impact:** The unused helper sends amountFils divided by10 while labelling it fils; feeReversedFils stays unscaled. No caller or implemented /internal/refund-adjustment endpoint exists. This is a latent malformed request, not evidence settlement currently deducts a tenth of a refund.
 
 **Code references:** [apps/api/src/admin/settlementClient.ts](apps/api/src/admin/settlementClient.ts).
 
@@ -812,9 +742,9 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Code references:** [apps/api/src/fees/estimate.ts](apps/api/src/fees/estimate.ts), [apps/api/src/settlement/query.ts](apps/api/src/settlement/query.ts), [apps/settlement/internal/settlement/discounted_fee.go](apps/settlement/internal/settlement/discounted_fee.go).
 
-**Suggested fixes:** Mirror the Go calculation with `applyRateFils` (discount first, then MDR).
+**Suggested fixes:** Use exact integer rate arithmetic with the authoritative formula selected under B66. Do not automatically adopt Go ordering; its contract authority is disputed.
 
-**Why this approach:** CLAUDE.md treats the Go service as the fee reference; one rounding rule everywhere.
+**Why this approach:** The rounding/formula mismatch is confirmed, but the old CLAUDE.md assertion is not pricing authority.
 
 **Dependencies / verification:** B39. Compare report and batch fees across seed data.
 
@@ -830,7 +760,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Why this approach:** Matches the documented design; uniqueness constraints do not provide unpredictability.
 
-**Dependencies / verification:** B33 (same helper). CLAUDE.md and .cursorrules call this acceptable, which conflicts with ARCHITECTURE.md.
+**Dependencies / verification:** B33 uses the same random helper. The old agent-rule justification was removed; uniqueness does not establish unpredictability.
 
 - [ ] **B51 — Admin invite code references a table that does not exist**
 
@@ -850,7 +780,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Category:** Operational safety.
 
-**Summary and business impact:** The seed runs `TRUNCATE … merchants … CASCADE`, which empties every table that references merchants (refunds, credits, webhooks, API keys, fee schedules, and more). The RUNBOOK and compose comments say the seed only touches its own fixtures and is safe against a shared staging database. That claim explains the staging-2 reset.
+**Summary and business impact:** The seed TRUNCATE includes merchants CASCADE and can empty all referencing data, not just fixture rows. Shared-database safety assurances are false. This is a possible reset mechanism, not independent proof of who caused a narrated staging reset.
 
 **Code references:** [db/seed/generate.ts](db/seed/generate.ts), [docs/RUNBOOK.md](docs/RUNBOOK.md), [ops/docker-compose.yml](ops/docker-compose.yml).
 
@@ -864,29 +794,15 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Category:** Security.
 
-**Summary and business impact:** `ops/.env.docker` is tracked in git and contains `ACQUIRER_CALLBACK_SIGNING_SECRET` and `NODE_ENV=production`. Its comments say it is gitignored, but `.gitignore` lists only `.env`, and compose never loads the file anyway.
+**Summary and business impact:** ops/.env.docker is tracked and contains a callback-secret value. Compose does not load it via env_file. Sandbox-only labelling does not prove actual credential use or production compromise.
 
 **Code references:** [ops/.env.docker](ops/.env.docker), [.gitignore](.gitignore), [ops/docker-compose.yml](ops/docker-compose.yml).
 
-**Suggested fixes:** Rotate the secret with the acquirer, remove the file from git and add it to `.gitignore`, and provide a committed `.env.docker.example` without values.
+**Suggested fixes:** Replace embedded examples with placeholders and correct ignore/loading guidance. Rotate with the provider if actual sandbox/live use is confirmed; do not assert a real credential incident from scenario text alone.
 
 **Why this approach:** Anyone with repository access has the secret; deleting the file alone leaves it in history.
 
 **Dependencies / verification:** B23. Confirm with the acquirer whether this is the sandbox or a live secret.
-
-- [ ] **B54 — Orphaned "production-equivalent" seed file**
-
-**Category:** Data hygiene / possible data exposure.
-
-**Summary and business impact:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql) (50,338 lines, labelled "production-equivalent", from a "prod-mirror" environment) is referenced by no code, config or doc. It posts to four ledger accounts that do not exist (`merchant_receivable`, `platform_fee`, `refund_payable`, `settlement_holding`), so it could not load.
-
-**Code references:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql).
-
-**Suggested fixes:** Find out who added it and whether it contains real merchant or customer data; if it does, remove it and handle as a data incident.
-
-**Why this approach:** Production-derived data in a repository is a confidentiality risk regardless of whether code uses it.
-
-**Dependencies / verification:** None.
 
 - [ ] **B55 — Documented nightly balance refresh does not exist**
 
@@ -902,33 +818,19 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B14.
 
-- [ ] **B56 — AI agent rule files contradict ADR-0001 and the settlement window**
+- [x] **B56 — AI agent rule files contradict ADR-0001 and the settlement window**
 
-**Category:** Documentation / process risk.
+**Category:** Resolved documentation defect; historical record retained.
 
-**Summary and business impact:** CLAUDE.md, AGENTS.md and .cursorrules state that money is integer cents (1 BD = 100), that `INTEGER` columns are fine, that `float32` is acceptable in Go, and that settlement uses UTC midnight. ADR-0001, ARCHITECTURE.md and the money package all say 1 BD = 1000 fils, `BIGINT`, and no floats; settlement is Bahrain midnight. Any assistant following these files would introduce the bugs in B11, B12 and B46.
+**Summary and business impact:** Original rules prescribed cents, UTC windows and acceptable float32 money. Current CLAUDE.md is source-linked YA-attribution guidance; AGENTS.md/.cursorrules point to it and state correct fils/Bahrain facts. The original false instructions are removed; financial policy disputes remain separate.
 
 **Code references:** [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md), [.cursorrules](.cursorrules), [docs/adr/0001-integer-fils.md](docs/adr/0001-integer-fils.md).
 
-**Suggested fixes:** Correct all three files to match ADR-0001 and ARCHITECTURE.md, and have the corrections reviewed.
+**Suggested fixes:** No further fix for the original false-unit/window instructions. Keep attribution distinct from correctness.
 
 **Why this approach:** These files are read automatically by coding assistants.
 
 **Dependencies / verification:** None.
-
-- [ ] **B57 — Migration runner does not checksum applied files**
-
-**Category:** Process / documentation.
-
-**Summary and business impact:** A comment in `db/migrate.ts` (MK) says applied migrations are checksummed and edits are refused. `schema_migrations` stores only filename and timestamp, so an edited migration is silently skipped on databases that already ran it, and the schemas drift.
-
-**Code references:** [db/migrate.ts](db/migrate.ts).
-
-**Suggested fixes:** Store a content hash per file and fail on mismatch, or correct the comment and enforce "never edit applied migrations" in review.
-
-**Why this approach:** Makes the existing rule enforceable.
-
-**Dependencies / verification:** B02, B03.
 
 - [x] **B58 — Every refund without a reason violates the refunds constraint**
 
@@ -944,14 +846,11 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B16, B20, B21. The 11 existing refund tests should pass once fixed, without modifying them.
 
-**Decision (2026-10-30, final): a reason is optional**, as Yousif designed it. [processRefund.ts](apps/api/src/payments/processRefund.ts) stores a missing, empty or whitespace-only reason as `'unspecified'` (`UNSPECIFIED_REFUND_REASON`, matching 0070's column default) instead of sending NULL; a given reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5). All 15 locked refund tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` now pass **unmodified**; full api suite 391/392.
+**Current fork behavior: a reason is optional.** [processRefund.ts](apps/api/src/payments/processRefund.ts) stores a missing, empty or whitespace-only reason as `'unspecified'` (`UNSPECIFIED_REFUND_REASON`, matching 0070's column default) instead of sending NULL; a given reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5). All 15 locked refund tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` now pass **unmodified**; full api suite 391/392.
 
-**Why optional (evidence):**
-- Yousif's handover (2026-04-09): "`processRefund.ts` is the helper and I'd consider it done: it needs the route and the drawer wired." His original code (`9844457`) had `reason?: string` stored as `input.reason ?? null`, his tests send no reason, and his refunds table (0042) has a nullable `reason TEXT`.
-- 0070's constraint is not his. It sits in `67f8949` (authored as Yousif, committer `placeholder`, dated 2026-01-19), but 0069 shipped in 1.9.0 on 2026-07-21, so 0070 was written after he left on 2026-04-09. No CHANGELOG entry, doc, ADR or meeting note mentions it, and its comment about "existing refunds created before the reason field was required" describes refunds that never existed (the route has always returned 501).
-- It broke a finished feature and its tests, inviting the next maintainer to rewrite the locked tests or make the field mandatory. An interim version of this fix (2026-10-30) made the reason mandatory and broke 15 locked tests; it was reverted after this review.
+**Evidence limits:** Original optional types/tests and nullable reason support optional input; the current fork writes unspecified, satisfying0070. Editable author names and release dates do not prove who wrote0070 or when. Claims that its actual author maliciously broke a finished feature have been removed. Runtime validation of non-string reasons is not established by this resolution.
 
-- [x] **B59 — Webhook backoff test asserts an exact delay the code randomises**
+- [ ] **B59 — Webhook backoff test asserts an exact delay the code randomises**
 
 **Category:** Invalid test.
 
@@ -965,13 +864,13 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None. Not caused by any 2026-10-29 change; this is the only non-refund api failure.
 
-**Resolution (2026-10-30), as decided: corrected copy in a new file.** The jitter and the exact-delay assertion were added in the same commit (`c2f3627`), so the test was wrong from the start. New [dispatcher.backoff.new.test.ts](apps/api/src/webhooks/dispatcher.backoff.new.test.ts) repeats the backoff/exhaustion sequence, checks the delay actually applied to each row (`next_attempt_at − last_attempted_at`, both set from one database `now()`) against the ±10 % jitter range, and checks exact values (900/1000/1100 ms, doubling, the 60 s cap) with a fixed jitter source. 3/3 passing, stable across repeated runs. The original locked test is unchanged and still fails; treat that failure as known and superseded.
+**Partial remediation: replacement coverage exists, but the original failing assertion remains active.** The jitter and the exact-delay assertion were added in the same commit (`c2f3627`), so the test was wrong from the start. New [dispatcher.backoff.new.test.ts](apps/api/src/webhooks/dispatcher.backoff.new.test.ts) repeats the backoff/exhaustion sequence, checks the delay actually applied to each row (`next_attempt_at − last_attempted_at`, both set from one database `now()`) against the ±10 % jitter range, and checks exact values (900/1000/1100 ms, doubling, the 60 s cap) with a fixed jitter source. 3/3 passing, stable across repeated runs. The original locked test is unchanged and still fails; treat that failure as known and superseded.
 
 - [ ] **B60 — Test suites contaminate each other on a shared database**
 
 **Category:** Test reliability.
 
-**Summary and business impact:** CLAUDE.md requires the TypeScript and Go suites to run sequentially against one shared database. API tests leave synthetic `outbox_events` with empty `{}` payloads (no `merchantId`); the reporting tests then consume them and fail with `null value in column "merchant_id"`. On a clean database all 11 reporting tests pass. As documented, the full suite can therefore never pass locally. Production is not affected: real producers (capture, void, refund) always include `merchantId`.
+**Summary and business impact:** Historical records report API fixtures with empty outbox payloads contaminating reporting tests on a shared database. Current CLAUDE.md does not require that setup. This is a test-isolation concern under that setup, not proof the full suite can never pass locally. It was not rerun against a disposable database in this audit.
 
 **Code references:** [apps/reporting/src/consumer/runConsumerPass.test.ts](apps/reporting/src/consumer/runConsumerPass.test.ts), [apps/reporting/src/cli/rebuild.test.ts](apps/reporting/src/cli/rebuild.test.ts), [apps/api/src/webhooks/dispatcher.test.ts](apps/api/src/webhooks/dispatcher.test.ts), [CLAUDE.md](CLAUDE.md).
 
@@ -1029,7 +928,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Category:** Authorization (extends B35).
 
-**Summary and business impact:** `POST /v1/admin/merchants/:id/impersonate` has only `requireAdminSession`; there is no role check in the route or the middleware. CLAUDE.md claims a `super_admin` middleware gate; it does not exist. The route docblock says the grant is "merchant role 'support', always", but `MERCHANT_ROLE_FOR_ADMIN_ROLE` maps finance → `finance` and super_admin → `owner`. YA's comment in `requireMerchantAuth.ts` ("impersonation can't reach write routes") is also false given those roles.
+**Summary and business impact:** Start impersonation requires an admin session but no admin-role predicate. No current middleware supplies the previously claimed super_admin gate. The authorized role set requires an explicit policy decision. B35 covers actual write reachability even with support mapping.
 
 **Code references:** [apps/api/src/routes/adminMerchants.ts](apps/api/src/routes/adminMerchants.ts) (line 328), [apps/api/src/admin/impersonation.ts](apps/api/src/admin/impersonation.ts), [apps/api/src/auth/requireMerchantAuth.ts](apps/api/src/auth/requireMerchantAuth.ts), [CLAUDE.md](CLAUDE.md).
 
@@ -1039,20 +938,6 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B35. Test each admin role starting a grant and attempting a merchant write.
 
-- [ ] **B65 — A fully refunded partial capture becomes refundable again**
-
-**Category:** Refund amount validation (extends B21).
-
-**Summary and business impact:** After a full refund of a partial capture, `nextStatusAfterRefund` returns `partially_captured` because captured < authorized. That status is in `REFUNDABLE_STATUSES`, and the limit is authorized − refunded (B21), so a second refund passes validation even though every captured fil has been returned. YA's comment ("refundValidation stops the second refund since refunded == captured") is false: validation never compares against captured.
-
-**Code references:** [apps/api/src/payments/refundState.ts](apps/api/src/payments/refundState.ts) (line 47), [apps/api/src/payments/refundValidation.ts](apps/api/src/payments/refundValidation.ts), [apps/api/src/payments/processRefund.ts](apps/api/src/payments/processRefund.ts) (line 90).
-
-**Suggested fixes:** Fix B21 (limit = captured − refunded − pending), and give a transaction whose captured amount is fully refunded the `refunded` status (per Huda's rule quoted in `refundState.ts`).
-
-**Why this approach:** Both the status and the amount check must reflect captured money.
-
-**Dependencies / verification:** B21, B20, B16. Test: authorize 1000, capture 400, refund 400, then a second refund must be rejected.
-
 - [ ] **B66 — Capture applies the discount after MDR; settlement applies it before**
 
 **Category:** Money correctness.
@@ -1061,7 +946,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Code references:** [apps/api/src/payments/discountAdjustment.ts](apps/api/src/payments/discountAdjustment.ts), [apps/api/src/routes/transactions.ts](apps/api/src/routes/transactions.ts) (line 111), [apps/settlement/internal/settlement/discounted_fee.go](apps/settlement/internal/settlement/discounted_fee.go), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-**Suggested fixes:** Compute the capture fee with the same order and rounding as Go (`applyRateFils` on the discounted amount). The docblock's "partner-pricing addendum" justification needs confirming with finance before keeping either order.
+**Suggested fixes:** Obtain the approved pricing formula and rounding order, then align API capture, checkout, reporting and Go settlement. Go is not automatically authoritative because a test or architecture paragraph says so. Preserve15-versus14 as the regression case.
 
 **Why this approach:** One fee formula across capture, reporting (B49) and settlement.
 
@@ -1099,7 +984,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 ## Checklist review — 2026-10-29
 
-Every item B01–B60 was re-checked against the code, because this repository is built to mislead reviewers. No item is outright false. These need reclassifying or qualifying:
+Historical notes below are superseded by the current source audit where they conflict. They are not independent verification of all claims:
 
 | Item | Finding |
 |---|---|
@@ -1115,7 +1000,7 @@ Ruled out as decoys: the unscoped transaction reads in `apps/api/src/v1/routes/t
 
 ## Test suite results — 2026-10-29
 
-Run against a dedicated migrated database `filspay_test` (local Docker), TypeScript then Go, as CLAUDE.md specifies.
+Historical author-reported run against filspay_test, not repeated in this source audit. Current CLAUDE.md does not prescribe that setup.
 
 | Suite | Result | Notes |
 |---|---|---|
@@ -1137,3 +1022,290 @@ For escalation; recorded so they are not lost.
 - **Commit `a9b2753`** (merchant login, OTP, sessions; the source of B42) is authored as Fatima Haji, dated 2025-08-14. ONBOARDING.md says she joined in June 2026.
 - **Undocumented migration gaps:** 0059, 0062, 0063 and 0067, in addition to the documented 0039, 0041 and 0054–0056.
 - **This checklist** was committed by `ProfessorMaryam <lifeasmaryam7@gmail.com>` (a personal address), and its stated source `bugs.md` is not in the repository.
+
+## Decisions, integration scope and consolidated scenarios
+
+Removed from active confirmed-bug remediation; IDs retained to preserve references. No fix is implied by reclassification.
+
+- [ ] **B07 — Card processing uses only a simulator**
+
+**Category:** Integration decision.
+
+**Summary and business impact:** The API always constructs a simulator; approvals do not represent real card processing. This is a live-launch gap, not necessarily a defect for a demo.
+
+**Code references:** [apps/api/src/app.ts](apps/api/src/app.ts), [apps/api/src/acquirer/simulator.ts](apps/api/src/acquirer/simulator.ts), [apps/api/src/acquirer/types.ts](apps/api/src/acquirer/types.ts).
+
+**Suggested fixes:** Decide whether the target is a demo or live payments. For live use, add a provider adapter with stable idempotency, timeout recovery and callback verification; retain an explicit simulator mode.
+
+**Why this approach:** Keeps demonstrations deterministic and prevents simulated approvals being mistaken for live payments.
+
+**Dependencies / verification:** B17–B23. Requires a provider contract; do not mark live-ready from simulator tests.
+
+- [ ] **B08 — Paid batch status does not represent a confirmed bank transfer**
+
+**Category:** Integration decision.
+
+**Summary and business impact:** Payout code posts ledger entries and marks batches paid without initiating or confirming a bank transfer. The business cannot treat that status as evidence of disbursement.
+
+**Code references:** [apps/settlement/internal/settlement/batch.go](apps/settlement/internal/settlement/batch.go), [apps/settlement/internal/splits/allocate.go](apps/settlement/internal/splits/allocate.go), [apps/settlement/internal/settlement/payout_notify.go](apps/settlement/internal/settlement/payout_notify.go), [apps/api/src/webhooks/payoutDisbursement.ts](apps/api/src/webhooks/payoutDisbursement.ts).
+
+**Suggested fixes:** For live payouts, add a durable payout instruction and provider/manual-confirmation workflow. Mark paid only on authoritative confirmation; make retries and ledger posting idempotent.
+
+**Why this approach:** Separates money owed, transfer requested and transfer completed, preventing false payout confirmations.
+
+**Dependencies / verification:** B11, B24, B25 and B28. Coordinate ledger, status, reports and notifications; demo-only scope must be explicit.
+
+- [ ] **B09 — OTP delivery is a logging stub**
+
+**Category:** Integration gap.
+
+**Summary and business impact:** No real email or SMS delivery exists. In production the code is not logged, so users cannot complete normal OTP login through a delivery channel.
+
+**Code references:** [apps/api/src/auth/notifier.ts](apps/api/src/auth/notifier.ts), [apps/api/src/adminAuth/notifier.ts](apps/api/src/adminAuth/notifier.ts), [apps/api/src/config.ts](apps/api/src/config.ts).
+
+**Suggested fixes:** Add a notifier adapter for the selected delivery provider with bounded retries and delivery-failure handling. Keep development exposure explicitly restricted to development.
+
+**Why this approach:** Makes two-step login usable without leaking production authentication codes into logs.
+
+**Dependencies / verification:** B32 and B33. Test delivery failure, expiry and resend for merchant and admin accounts.
+
+- [ ] **B13 — Balance adjustments affect only the cache despite journaled documentation**
+
+**Category:** Accounting policy conflict.
+
+**Summary and business impact:** The active adjustment route updates the cached balance and audit log but not the ledger. Corrections disappear on rebuild and disagree with ADMIN.md; ADR 0006 prescribes cache-only behavior.
+
+**Code references:** [apps/api/src/routes/adminBalanceAdjustments.ts](apps/api/src/routes/adminBalanceAdjustments.ts), [apps/api/src/admin/balanceAdjustments.ts](apps/api/src/admin/balanceAdjustments.ts), [apps/api/src/admin/ledgerAdjustments.ts](apps/api/src/admin/ledgerAdjustments.ts), [docs/ADMIN.md](docs/ADMIN.md), [docs/adr/0006-display-adjustments.md](docs/adr/0006-display-adjustments.md).
+
+**Suggested fixes:** Resolve the documented policy conflict. For actual financial corrections, use balanced journal entries with reasons and effective dates, and update the cache consistently. Label any retained display-only corrections explicitly.
+
+**Why this approach:** Distinguishes a financial correction from a visual override and prevents a rebuild from silently undoing real corrections.
+
+**Dependencies / verification:** B14 and B28. Review existing cache adjustments before migration; do not automatically journal all historical display changes.
+
+- [ ] **B17 — Client timestamps can bypass payment-link expiry**
+
+**Category:** Documented client-clock security-policy decision.
+
+**Summary and business impact:** Expiry checking trusts submittedAt from the payer, allowing a backdated request to make an expired link payable.
+
+**Code references:** [apps/api/src/paymentLinks/pay.ts](apps/api/src/paymentLinks/pay.ts), [apps/api/src/routes/paymentLinks.ts](apps/api/src/routes/paymentLinks.ts), [apps/web/src/pages/checkout/CheckoutPage.tsx](apps/web/src/pages/checkout/CheckoutPage.tsx).
+
+**Decision needed:** Architecture expressly permits offline-terminal submittedAt. Backdating is possible by design; changing to server-clock expiry requires an explicit approved policy change.
+
+**Why this approach:** This is an explicit client-clock policy with security implications, not an accidental implementation divergence.
+
+**Dependencies / verification:** B18. ARCHITECTURE.md currently describes client-time expiry; explicitly supersede that policy when implementing this reported defect.
+
+- [ ] **B30 — Lifetime payout totals lose whole-fils precision**
+
+**Category:** Approximate monitoring limitation; not actual payout arithmetic.
+
+**Summary and business impact:** Payout accumulation converts amounts to float32 and stores the total as REAL, losing precision for high-volume merchants.
+
+**Code references:** [apps/settlement/internal/settlement/payout_estimate.go](apps/settlement/internal/settlement/payout_estimate.go), [db/migrations/0040_merchants_lifetime_payout_monitoring_estimate.sql](db/migrations/0040_merchants_lifetime_payout_monitoring_estimate.sql).
+
+**Decision needed:** monitoring_estimate is explicitly approximate and no read feeds payout amounts. Integer migration is optional accuracy work if an actual consumer requires exact totals; B11 separately covers payout-affecting precision loss.
+
+**Why this approach:** Reconstructing from exact source records recovers information that casting an already-rounded float cannot restore.
+
+**Dependencies / verification:** B11, B08 and B28. Treat schema changes as explicit migrations and reconcile before/after totals.
+
+- [ ] **B54 — Orphaned "production-equivalent" seed file**
+
+**Category:** Unused fixture integrity/hygiene; no established personal-data exposure.
+
+**Summary and business impact:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql) (50,338 lines, labelled "production-equivalent", from a "prod-mirror" environment) is referenced by no code, config or doc. It posts to four ledger accounts that do not exist (`merchant_receivable`, `platform_fee`, `refund_payable`, `settlement_holding`), so it could not load.
+
+**Code references:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql).
+
+**Decision needed:** Production/prod-mirror labels are unverified. Inspected merchants match fictional fixtures. Invalid account IDs are an artifact-validity issue, not proof of leaked customer data. Escalate exposure only with independent real-data evidence.
+
+**Why this approach:** The artifact has incompatible fixture entries; claimed production provenance alone does not establish confidentiality exposure.
+
+**Dependencies / verification:** None.
+
+- [ ] **B65 — A fully refunded partial capture becomes refundable again**
+
+**Category:** Duplicate B21 scenario: latent amount-bound defect, not an established status-policy bug.
+
+**Summary and business impact:** After a full refund of a partial capture, `nextStatusAfterRefund` returns `partially_captured` because captured < authorized. That status is in `REFUNDABLE_STATUSES`, and the limit is authorized − refunded (B21), so a second refund passes validation even though every captured fil has been returned. YA's comment ("refundValidation stops the second refund since refunded == captured") is false: validation never compares against captured.
+
+**Code references:** [apps/api/src/payments/refundState.ts](apps/api/src/payments/refundState.ts) (line 47), [apps/api/src/payments/refundValidation.ts](apps/api/src/payments/refundValidation.ts), [apps/api/src/payments/processRefund.ts](apps/api/src/payments/processRefund.ts) (line 90).
+
+**Suggested fixes:** Fix captured-minus-refunded-minus-pending availability under B21/B20. Do not require refunded status until authorization-headroom policy is resolved. Partially_captured alone cannot permit excess refunds when the amount bound is correct.
+
+**Why this approach:** A correct captured-funds bound prevents duplicate refunds regardless of a separately agreed authorization-headroom status policy.
+
+**Dependencies / verification:** B21, B20, B16. Test: authorize 1000, capture 400, refund 400, then a second refund must be rejected.
+
+- [x] **B57 — Migration runner does not checksum applied files**
+
+**Category:** Process / documentation.
+
+**Summary and business impact:** Historical checksum assurance was false. The runner tracks filenames/timestamps only. This audit corrected the misleading comment; checksums remain optional hardening, not an established business requirement.
+
+**Code references:** [db/migrate.ts](db/migrate.ts).
+
+**Suggested fixes:** Comment corrected. No checksum enforcement was added. Use new migrations for upgrades; consider checksums separately if required.
+
+**Why this approach:** Correcting a comment removes a false guarantee; it does not add technical enforcement.
+
+**Dependencies / verification:** B02, B03.
+
+
+## New source-confirmed findings - 2026-10-30
+
+No production or disposable-database integration reproduction is claimed for these findings.
+
+- [ ] **B69 - Capture idempotency omits transaction identity**
+
+**Evidence and impact:** Capture hashes amount only while key scope is merchant+endpoint+key. Reusing the key/amount for another transaction can replay the first result.
+
+**Code references:** [apps/api/src/payments/capture.ts](apps/api/src/payments/capture.ts).
+
+**Suggested fixes:** Include transaction ID in canonical request identity; test cross-resource reuse.
+
+- [ ] **B70 - Checkout omits negotiated discount adjustment**
+
+**Evidence and impact:** Only the transaction route invokes applyCaptureDiscountAdjustment; payment-link pay calls captureTransaction directly without that adjustment.
+
+**Code references:** [apps/api/src/paymentLinks/pay.ts](apps/api/src/paymentLinks/pay.ts).
+
+**Suggested fixes:** Use one agreed fee flow after resolving B66.
+
+- [ ] **B71 - Payout records depend on webhook subscriber count**
+
+**Evidence and impact:** Dispatcher PRE_DELIVERY_EFFECTS inserts a disbursement per first delivery attempt. Zero subscribers means no record; multiple endpoints/replays mean multiple records. This is not proof of duplicate bank transfers.
+
+**Code references:** [apps/api/src/webhooks/dispatcher.ts](apps/api/src/webhooks/dispatcher.ts).
+
+**Suggested fixes:** Record actual payout bookkeeping once per business payout, independently of notification delivery.
+
+- [ ] **B72 - Report scope accepts an unrelated merchant child**
+
+**Evidence and impact:** resolveReportMerchantId checks global child membership without authenticated parent membership. A merchant can request another marketplace child transactions.
+
+**Code references:** [apps/api/src/reporting/scope.ts](apps/api/src/reporting/scope.ts).
+
+**Suggested fixes:** Scope the parent-child relationship to caller and requested child; test unrelated tenants.
+
+- [ ] **B73 - Rollback failure masks the original transaction error**
+
+**Evidence and impact:** Awaiting ROLLBACK before rethrow means rollback rejection replaces the original error. This proves error masking, not that every failed client is reused.
+
+**Code references:** [apps/api/src/db/withTransaction.ts](apps/api/src/db/withTransaction.ts).
+
+**Suggested fixes:** Preserve original failure, record rollback error separately and discard a confirmed broken client.
+
+- [ ] **B74 - Reporting cursor is not locked across processes**
+
+**Evidence and impact:** readCursor lacks FOR UPDATE; separate worker/catch-up processes can apply the same existing-cursor range. Local running flag cannot serialize processes.
+
+**Code references:** [apps/reporting/src/consumer/cursor.ts](apps/reporting/src/consumer/cursor.ts).
+
+**Suggested fixes:** Serialize by durable consumer identity and test concurrent passes.
+
+- [ ] **B75 - Sequence watermark skips late-committing events**
+
+**Evidence and impact:** A reserves low ID, B commits high ID, consumer advances high, A commits afterward and is excluded by id > watermark. Sequence allocation is not commit order.
+
+**Code references:** [apps/reporting/src/consumer/runConsumerPass.ts](apps/reporting/src/consumer/runConsumerPass.ts).
+
+**Suggested fixes:** Use durable per-event consumption or correctly designed commit-safe ordering; coordinate B74.
+
+- [ ] **B76 - Admin analytics rebuild does not coordinate consumer cursor**
+
+**Evidence and impact:** Admin refresh includes transaction_events already committed but not yet consumed; subsequent worker replay can add them again. Source rebuild does not move/lock cursor to its snapshot.
+
+**Code references:** [apps/api/src/admin/reportingRebuild.ts](apps/api/src/admin/reportingRebuild.ts).
+
+**Suggested fixes:** Coordinate snapshot, cursor and worker, or use one safe replay/rebuild mechanism.
+
+- [ ] **B77 - Missing daily rollup can poison batch-close reporting**
+
+**Evidence and impact:** With captures but no daily-volume row, applyBatchClosed dereferences rows[0].captured_count and throws. Rollback/retry can repeat indefinitely. Missing-batch coverage is not missing-rollup coverage.
+
+**Code references:** [apps/reporting/src/consumer/applyEvent.ts](apps/reporting/src/consumer/applyEvent.ts).
+
+**Suggested fixes:** Handle/recover missing rollup and test it separately.
+
+- [ ] **B78 - Payout trends omit paid lifecycle updates**
+
+**Evidence and impact:** Consumer handles batch_closed but not settlement.paid. If close is consumed before payout, cached status/paid_at remain stale until rebuilt.
+
+**Code references:** [apps/reporting/src/consumer/runConsumerPass.ts](apps/reporting/src/consumer/runConsumerPass.ts).
+
+**Suggested fixes:** Apply payout lifecycle changes idempotently and test close-before-pay ordering.
+
+- [ ] **B79 - Reporting export-summary lacks authentication prehandler**
+
+**Evidence and impact:** Registered route dereferences merchantAuth without running its authentication prehandler. A cookie alone does not populate context. This is an error path, not established data disclosure.
+
+**Code references:** [apps/api/src/routes/reporting.ts](apps/api/src/routes/reporting.ts).
+
+**Suggested fixes:** Require authentication and test missing/valid/expired credentials.
+
+- [ ] **B80 - Webhook response bodies have no byte limit**
+
+**Evidence and impact:** response.text buffers the full response before SQL excerpt truncation. A timeout bounds duration, not memory. No specific OOM was reproduced.
+
+**Code references:** [apps/api/src/webhooks/transport.ts](apps/api/src/webhooks/transport.ts).
+
+**Suggested fixes:** Bound streamed response bytes and preserve timeout/cancellation; coordinate SSRF fix B63.
+
+- [ ] **B81 - PDF-only KYC check trusts filename**
+
+**Evidence and impact:** Generic magic accepts JPEG/PNG/PDF; document-specific check tests .pdf extension. A JPEG named CR.pdf passes.
+
+**Code references:** [apps/api/src/onboarding/kyc.ts](apps/api/src/onboarding/kyc.ts).
+
+**Suggested fixes:** Compare detected type against document-specific requirement; test renamed images.
+
+- [ ] **B82 - Thumbnail lacks an application-specific decoded-pixel budget**
+
+**Evidence and impact:** Compressed upload cap does not bound decoded pixels. sharp is invoked without an explicit application memory/pixel budget. No current library default or actual OOM was verified here.
+
+**Code references:** [apps/api/src/onboarding/kycThumbnail.ts](apps/api/src/onboarding/kycThumbnail.ts).
+
+**Suggested fixes:** Define measured pixel/concurrency limits for container capacity. This is a resource risk, not a confirmed exploit.
+
+- [ ] **B83 - Refund reversal ignores discounted fee debits**
+
+**Evidence and impact:** Latent: query sums fee-revenue credits only, ignoring discount debits. Independent partial rounding also lacks cumulative reversed-fee accounting. Public route remains501.
+
+**Code references:** [apps/api/src/payments/processRefund.ts](apps/api/src/payments/processRefund.ts).
+
+**Suggested fixes:** Reverse remaining net charged fee cumulatively; coordinate B16/B20/B21 before launch.
+
+- [ ] **B84 - Webhook delivery attempts lack cross-replica claim**
+
+**Evidence and impact:** Due rows are selected without lock or claimed state. Replicas can send same row and execute first-attempt financial effects concurrently. At-least-once notifications do not excuse duplicate bookkeeping.
+
+**Code references:** [apps/api/src/webhooks/dispatcher.ts](apps/api/src/webhooks/dispatcher.ts).
+
+**Suggested fixes:** Claim attempts durably and make business effects separately idempotent; coordinate B24/B71.
+
+- [ ] **B85 - Bulk KYC bypasses advertised state/review trail**
+
+**Evidence and impact:** Bulk update accepts every supplied merchant ID without under_review predicate and writes bulk admin audit without individual merchant_kyc_reviews. The individual review workflow differs.
+
+**Code references:** [apps/api/src/admin/bulkKyc.ts](apps/api/src/admin/bulkKyc.ts).
+
+**Suggested fixes:** Confirm bulk-transition policy and preserve required individual review evidence.
+
+- [ ] **B86 - Saved-filter listing relies on nonexistent count cap**
+
+**Evidence and impact:** Code claims a50-filter CHECK in0061, but0061 seeds accounts and0069 has no count cap. Inserts/list are unbounded. This is a capacity risk, not a reproduced outage.
+
+**Code references:** [apps/api/src/reporting/savedFilters.ts](apps/api/src/reporting/savedFilters.ts).
+
+**Suggested fixes:** Enforce an actual quota or paginate; remove fictitious constraint assurance.
+
+- [ ] **B87 - Webhook deletion conflicts with foreign-key retention promises**
+
+**Evidence and impact:** deleteWebhookEndpoint hard-deletes the endpoint. Delivery endpoint_id is NOT NULL with a restrictive FK, not ON DELETE SET NULL/CASCADE; archives also reference endpoints. Existing rows can cause a constraint failure rather than the promised retained-history deletion. No migration altering that delivery FK was found.
+
+**Code references:** [cancel.ts](apps/api/src/webhooks/cancel.ts), [0022](db/migrations/0022_webhook_deliveries.sql), [0068](db/migrations/0068_webhook_delivery_archives.sql).
+
+**Suggested fixes:** Agree explicit disable/delete/retention semantics; preserve audit history and test an endpoint with deliveries/archives. Do not silently cascade-delete evidence.

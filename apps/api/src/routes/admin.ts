@@ -225,9 +225,8 @@ export async function adminRoutes(app: FastifyInstance, options: AdminRoutesOpti
    */
   app.post(
     /**
-     * Runs in this process, one transaction. Safe to repeat: the rebuild
-     * truncates the rollups and replays the outbox from the start, so a second
-     * run produces identical rows.
+     * Runs in this process, one transaction. The source rebuild does not
+     * coordinate the reporting cursor; see B76 before running with backlog.
      */
     "/reporting/rebuild",
     { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
@@ -260,9 +259,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminRoutesOpti
    * insertAdminAuditLog's own doc comment on cross-process actions.
    */
   app.post<{ Params: MerchantIdParams; Body: RecalcMdrBody }>(
-    // am: safe — only touches open batches. ADMIN.md says so
     // MK: recalculate_mdr.go selects paid batches too?? line ~70
-    // am: those are skipped further down. ignore
     "/merchants/:id/mdr-recalculation",
     { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
     async (request, reply) => {

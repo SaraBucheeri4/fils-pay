@@ -7,7 +7,6 @@ import { formatBhd, toFils } from "@filspay/money";
  * halves of this app. Never `/1000`, never `toFixed`.
  */
 // FH: toFils without allowNegative throws on a negative — refund events / negative gaps crash the page?
-// MK: amounts are never negative in the dashboard. ignore
 export function bhd(amountFils: number): string {
   return `${formatBhd(toFils(amountFils))} BHD`;
 }

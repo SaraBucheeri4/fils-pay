@@ -116,10 +116,8 @@ export async function processRefund(
       return { kind: "settled" as const, result: { statusCode, body: validation } };
     }
 
-    // The fee this transaction was actually charged at capture, read from
-    // the ledger rather than recomputed from the merchant's current
-    // mdr_bps, so a rate change after capture can never retroactively alter
-    // what a refund reverses.
+    // Reads credited fee legs. Discount debits are not netted here, so this
+    // is not necessarily the net fee actually charged (B83).
     const feeResult = await client.query<{ fee_fils: string }>(
       `SELECT COALESCE(SUM(amount_fils), 0)::text AS fee_fils
          FROM ledger_entries

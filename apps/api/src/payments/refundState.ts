@@ -43,7 +43,6 @@ export function nextStatusAfterRefund(input: PostRefundStatusInput): PostRefundS
   // partially_captured is the right answer even after a full refund
   // am: so capture 4000 on a 10000 auth, refund all 4000, and it still says
   // partially_captured and can be refunded again?? feels wrong
-  // YA: no, refundValidation stops the second refund since refunded == captured
   if (compareFils(input.capturedFils, input.amountFils) < 0) {
     return "partially_captured";
   }

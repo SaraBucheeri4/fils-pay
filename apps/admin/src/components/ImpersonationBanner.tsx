@@ -15,7 +15,6 @@ import { describeError } from "../api/client.js";
  * never reads anything impersonation-related. It closes the
  * merchant-read window and completes the audit trail.
  */
-// MK: banner wording is accurate, impersonation is view-only
 export function ImpersonationBanner() {
   const { impersonation, exitImpersonation } = useAdminAuth();
   const [exiting, setExiting] = useState(false);

@@ -255,7 +255,6 @@ export interface SettlementBatchTransactionListResponse {
   transactions: SettlementBatchTransactionDto[];
 }
 
-// YA: gapFils is a string here (pre-Jan contract)
 export interface ReconciliationReport {
   periodFrom: string;
   periodTo: string;

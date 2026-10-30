@@ -64,9 +64,8 @@ async function main(): Promise<void> {
   }
 }
 
-// MK: schema_migrations also stores a checksum per file and refuses to run
-// if an applied migration has changed — so never edit an applied .sql file,
-// not even its comments.
+// Migration tracking stores filenames only; it does not detect edits to
+// already-applied files. Use new migrations for upgrades (B57).
 // AM: I only see filename + applied_at in the table?
 async function bootstrapSchemaMigrationsTable(client: Client): Promise<void> {
   await client.query(`

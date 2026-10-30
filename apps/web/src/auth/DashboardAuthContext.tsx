@@ -52,9 +52,7 @@ export function writeLastMerchantId(merchantId: string): void {
  * impersonation does not exist in the merchant plane, so there is nothing
  * here to hold for it.
  */
-// memory leak here — me() refetched every render? heap grows on overview — am
 // FH: the effect runs once afaict. heap growth is probably the overview page
-// MK: VITE_SSO_MIGRATION flag replaces this provider anyway
 export function DashboardAuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<DashboardAuthStatus>("loading");
   const [me, setMe] = useState<DashboardMe | null>(null);

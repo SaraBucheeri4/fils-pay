@@ -4,7 +4,6 @@ import type { CreditRequestDto, CreditRequestListResponse, IssueCreditInput } fr
 /** `POST /v1/admin/merchants/:id/credits`. The fee reversal is never
  *  sent: asking for one is a boolean, and the server computes the figure
  *  from the merchant's own `mdr_bps`. */
-// server blocks support from issuing — am
 export function issueCredit(merchantId: string, input: IssueCreditInput): Promise<CreditRequestDto> {
   return request(`/v1/admin/merchants/${merchantId}/credits`, {
     method: "POST",

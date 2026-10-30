@@ -17,8 +17,8 @@ export interface WebhookTransportRequest {
 }
 
 export interface WebhookTransportResponse {
-  /** null on a transport-level failure (timeout, DNS, connection refused —
-   *  never reached the receiver) */
+  /** null when no completed transport response is available; a timeout
+   *  does not prove the receiver never processed the request. */
   statusCode: number | null;
   /** "" on a transport-level failure */
   body: string;
@@ -35,15 +35,12 @@ export function createFetchTransport(): WebhookTransport {
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), req.timeoutMs);
     try {
-      // YA: create.ts blocks private IPs, SSRF is handled upstream
       const response = await fetch(req.url, {
         method: "POST",
         headers: req.headers,
         body: req.body,
         signal: controller.signal,
       });
-      // unbounded read, a 1gb response would oom us? — am
-      // MK: timeoutMs bounds it. fine for now, revisit after Eid inshallah
       const body = await response.text();
       return { statusCode: response.status, body };
     } catch (err) {

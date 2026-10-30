@@ -13,7 +13,7 @@ export type KycDocumentType = "commercial_registration" | "owner_id" | "proof_of
 /** Document types the registry/bank issues as a PDF, never as a photo. */
 const PDF_ONLY_DOCUMENT_TYPES: readonly KycDocumentType[] = ["commercial_registration", "bank_letter"];
 
-/** @property fileName Informational only; never used for validation. */
+/** @property fileName Currently used by PDF-extension validation (B81). */
 export interface RecordKycDocumentInput {
   merchantId: string;
   documentType: KycDocumentType;
@@ -33,8 +33,8 @@ export interface RecordKycDocumentResult {
 }
 
 /**
- * Validates the upload from its own bytes (never the client-supplied
- * filename or Content-Type), writes it to disk under
+ * Detects the broad file type from bytes, but PDF-only narrowing still uses
+ * the client filename (B81). Writes it to disk under
  * `config.kycUploadDir/<merchantId>/<sha256>.<ext>`, and records it — moving
  * onboarding_status to 'under_review' as a side effect of "documents are
  * now in the queue," never touching kyc_passed.
@@ -44,23 +44,13 @@ export async function recordKycDocument(
   config: Config,
   input: RecordKycDocumentInput,
 ): Promise<RecordKycDocumentResult> {
-  // MK: magic-byte detection is the real gate. never trust fileName
   // polyglot pdf/jpeg files pass both checks?? — am
-  // MK: a polyglot is still a real pdf to the reviewer. parked
   const detected = detectFileType(input.buffer);
   if (!detected) {
     throw new UnprocessableEntityError("invalid_file_type");
   }
 
-  // Commercial registration certificates and bank letters are always
-  // issued as scanned/exported PDFs by the registry or the bank — a phone
-  // photo of either isn't an acceptable substitute for review. Checked
-  // against the filename since these come straight from each merchant's
-  // own scanner or the registry portal's own export, which name them
-  // consistently (`CR-2026.pdf`, `bank_letter.pdf`); `detected` above has
-  // already confirmed the bytes are one of our three accepted formats, so
-  // this only narrows which of those three this particular document type
-  // requires.
+  // Filename-only narrowing does not prove the detected type is PDF (B81).
   if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")) {
     throw new UnprocessableEntityError("document_must_be_pdf", "commercial_registration and bank_letter documents must be a PDF");
   }
