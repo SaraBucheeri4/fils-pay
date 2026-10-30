@@ -21,3 +21,4 @@ one that supersedes it and update the status line of the old one.
 | 0014 | [MDR recalculation ignores the volume tier](0014-volume-tier-excluded-from-recalculation.md) | Accepted; interim pending finance | 2026-10-30 |
 | 0015 | [Who enables refunds for a merchant](0015-refund-opt-in-administration.md) | Accepted | 2026-10-30 |
 | 0016 | [Review safety and accounting](0016-review-safety-and-accounting.md) | Accepted | 2026-10-30 |
+| 0017 | [Resend OTP email delivery](0017-resend-otp-delivery.md) | Accepted; login verification pending | 2026-10-30 |

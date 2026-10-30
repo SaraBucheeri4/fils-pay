@@ -1,0 +1,23 @@
+FROM node:22-bookworm AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY packages/money/package.json packages/money/
+COPY packages/events/package.json packages/events/
+COPY apps/api/package.json apps/api/
+COPY apps/reporting/package.json apps/reporting/
+COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
+RUN npm ci
+COPY packages/money packages/money
+COPY apps/web apps/web
+COPY apps/admin apps/admin
+ARG WEB_ORIGIN
+# API requests stay same-origin; only the impersonation link needs an origin.
+RUN npm run build -w apps/web
+RUN VITE_WEB_BASE_URL="$WEB_ORIGIN" npm run build -w apps/admin
+
+FROM caddy:2-alpine
+COPY --from=build /app/apps/web/dist /srv/web
+COPY --from=build /app/apps/admin/dist /srv/admin
+COPY ops/Caddyfile /etc/caddy/Caddyfile

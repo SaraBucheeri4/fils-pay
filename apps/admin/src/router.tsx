@@ -8,6 +8,7 @@ import { MerchantListPage } from "./pages/merchants/MerchantListPage.js";
 import { MerchantDetailPage } from "./pages/merchants/MerchantDetailPage.js";
 import { SettlementPage } from "./pages/settlement/SettlementPage.js";
 import { WebhookReplayPage } from "./pages/webhooks/WebhookReplayPage.js";
+import { CaptureReviewsPage } from "./pages/capture-reviews/CaptureReviewsPage.js";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "/merchants", element: <MerchantListPage /> },
       { path: "/merchants/:id", element: <MerchantDetailPage /> },
       { path: "/credits", element: <CreditsPage /> },
+      { path: "/capture-reviews", element: <CaptureReviewsPage /> },
       { path: "/settlement", element: <SettlementPage /> },
       { path: "/adjustment-imports", element: <AdjustmentImportPage /> },
       { path: "/webhooks", element: <WebhookReplayPage /> },

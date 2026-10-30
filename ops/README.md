@@ -6,6 +6,13 @@ demo instance uses the same compose file with a different `.env`.
 
 ## Quick start
 
+See [otp-email.md](otp-email.md) for Resend settings and local execution, and
+[hosting.md](hosting.md) for the prepared HTTPS hosting override and its gates.
+
+For durable KYC storage, existing-container migration precautions and the
+backup/restore drill, see [kyc-storage.md](kyc-storage.md). Complete the backup
+before recreating an API container that predates the volume mount.
+
 ```
 docker compose -f ops/docker-compose.yml up -d postgres
 docker compose -f ops/docker-compose.yml run --rm migrate

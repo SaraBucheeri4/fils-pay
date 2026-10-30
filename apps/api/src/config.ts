@@ -23,6 +23,10 @@ export interface Config {
   otpCodeLength: number;
   otpMaxAttempts: number;
   otpDevExpose: boolean;
+  resendApiKey?: string;
+  otpEmailFrom?: string;
+  /** Temporary demo routing, explicitly configured; unset to deliver to each user. */
+  otpEmailToOverride?: string;
   /** Release gate; merchant opt-in is independently required (ADR-0009). */
   refundsReleaseEnabled: boolean;
 
@@ -217,7 +221,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     otpTtlMinutes: parseIntEnv(env.OTP_TTL_MINUTES, 5),
     otpCodeLength: parseIntEnv(env.OTP_CODE_LENGTH, 6),
     otpMaxAttempts: parseIntEnv(env.OTP_MAX_ATTEMPTS, 5),
-    otpDevExpose: parseBoolEnv(env.OTP_DEV_EXPOSE, nodeEnv !== "production"),
+    otpDevExpose: nodeEnv !== "production" && parseBoolEnv(env.OTP_DEV_EXPOSE, true),
+    resendApiKey: env.RESEND_API_KEY,
+    otpEmailFrom: env.OTP_EMAIL_FROM ?? "FilsPay <onboarding@resend.dev>",
+    otpEmailToOverride: env.OTP_EMAIL_TO_OVERRIDE,
     refundsReleaseEnabled: parseBoolEnv(env.FEATURE_REFUNDS, false),
 
     argon2MemoryKib: parseIntEnv(env.ARGON2_MEMORY_KIB, 19_456),

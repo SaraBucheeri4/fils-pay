@@ -66,6 +66,8 @@ a `Webhook-Delivery-Id` and is signed with HMAC-SHA256.
 
 - Merchant login is password then OTP. The pending session grants nothing
   until the OTP is verified.
+- Merchant/admin OTP email uses Resend; ADR-0017 records the temporary demo
+  recipient override. Production never exposes codes in responses or logs.
 - Merchant-scoped queries take the merchant from the authenticated context.
 - Outbound webhook signatures are HMAC-SHA256 compared in constant time.
 - KYC uploads are validated by detected content type (magic bytes).

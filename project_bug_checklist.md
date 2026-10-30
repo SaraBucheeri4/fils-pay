@@ -1488,7 +1488,11 @@ question awaits the acquirer) and B53 (external rotation and git history).
 
 **Suggested fixes:** Add a finance and super admin console view for the existing list and resolve routes.
 
-- [ ] **B95 - CSV export can carry spreadsheet formulas**
+- [x] **B95 - CSV export can carry spreadsheet formulas**
+
+**Resolution (2026-10-30):** Both CSV paths neutralize formula-capable text before
+CSV escaping; CR quoting is preserved and signed numeric columns remain numbers.
+Verified with in-memory exports; details in [tasks/verification.md](tasks/verification.md).
 
 **Evidence and impact:** Reproduced: a reference of `=HYPERLINK("http://evil")` is exported as a quoted cell that begins with `=`, which a spreadsheet can still run.
 
@@ -1496,7 +1500,11 @@ question awaits the acquirer) and B53 (external rotation and git history).
 
 **Suggested fixes:** Neutralize cells beginning with `=`, `+`, `-` or `@`. Keep amounts unaffected, because negative amounts are legitimate.
 
-- [ ] **B96 - A malformed transaction id returns 500**
+- [x] **B96 - A malformed transaction id returns 500**
+
+**Resolution (2026-10-30):** Live detail, events, capture and void routes reject
+malformed UUIDs with 404 before database access. In-memory route checks confirmed
+zero queries for all four paths; the valid shape still reaches the scoped query.
 
 **Evidence and impact:** Reproduced: `GET /v1/transactions/not-a-uuid` returns 500 instead of 400 or 404. No data is exposed; it adds noise to error logs.
 
@@ -1504,7 +1512,11 @@ question awaits the acquirer) and B53 (external rotation and git history).
 
 **Suggested fixes:** Validate the id before querying, as the admin routes do with assertUuidParam.
 
-- [ ] **B97 - Signature check accepts junk appended to a valid signature**
+- [x] **B97 - Signature check accepts junk appended to a valid signature**
+
+**Resolution (2026-10-30):** Shared comparison requires exactly 64 hex characters
+before decoding. Manual digest/callback checks and 14 existing OTP/webhook unit
+checks passed. This does not resolve B23's body-format contract.
 
 **Evidence and impact:** Reproduced: a valid inbound signature followed by `zzzz` verifies, because hex decoding stops at the first invalid character. A signature still cannot be forged; the check is just looser than it looks.
 
@@ -1512,7 +1524,11 @@ question awaits the acquirer) and B53 (external rotation and git history).
 
 **Suggested fixes:** Require exactly 64 hex characters before decoding. The helper is shared, so check its other callers.
 
-- [ ] **B98 - Batch page progress bar uses float arithmetic on money**
+- [x] **B98 - Batch page progress bar uses float arithmetic on money**
+
+**Resolution (2026-10-30):** Removed the undefined bar and its floating-point
+calculation. Existing whole-fils amount formatting remains; frontend build and
+typechecking passed. No ledger/payout behavior changed.
 
 **Evidence and impact:** `parseFloat((batch.grossFils / 10000).toFixed(2))` sets a bar width, and ADR-0001 makes float arithmetic on money a review blocker. Display only; no ledger or payout effect. The resulting number has no clear meaning.
 

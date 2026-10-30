@@ -10,7 +10,10 @@ export interface TransactionsExportFilters {
 }
 
 function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+  // Quote alone does not prevent spreadsheet formula execution. This helper
+  // handles text only; genuine negative monetary columns remain numeric.
+  if (/^\s*[=+\-@]/u.test(value) || /^[\t\r\n]/u.test(value)) value = `'${value}`;
+  if (/[",\r\n]/u.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
@@ -18,10 +21,10 @@ function csvEscape(value: string): string {
 
 function toCsvRow(row: TransactionRow): string {
   return [
-    row.id,
-    row.status,
-    formatBhd(toFils(Number(row.amount_fils))),
-    formatBhd(toFils(Number(row.captured_fils))),
+    csvEscape(row.id),
+    csvEscape(row.status),
+    formatBhd(toFils(Number(row.amount_fils), { allowNegative: true })),
+    formatBhd(toFils(Number(row.captured_fils), { allowNegative: true })),
     csvEscape(row.reference ?? ""),
     row.occurred_at.toISOString(),
   ].join(",");
@@ -68,7 +71,7 @@ export async function* transactionsExportChunks(pool: Pool, filters: Transaction
        AND ($5::timestamptz IS NULL OR (occurred_at, id) > ($5, $6::uuid))
      ORDER BY occurred_at, id LIMIT 1000`,
     [filters.merchantId, filters.from ?? null, filters.to ?? null, status, cursorTime, cursorId]);
-   for (const row of result.rows) yield `${toCsvRow(row)},${formatBhd(toFils(Number(row.refunded_fils)))}\n`;
+   for (const row of result.rows) yield `${toCsvRow(row)},${formatBhd(toFils(Number(row.refunded_fils), { allowNegative: true }))}\n`;
    if (result.rows.length < 1000) break;
    const last = result.rows[result.rows.length - 1]!;
    cursorTime = last.cursor_time;

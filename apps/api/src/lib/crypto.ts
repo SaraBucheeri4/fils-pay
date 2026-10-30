@@ -12,6 +12,8 @@ export function sha256Hex(input: string | Buffer): string {
 
 /** Constant-time comparison of two hex-encoded digests. */
 export function timingSafeEqualHex(a: string, b: string): boolean {
+  // Buffer's hex decoder silently truncates invalid or incomplete input.
+  if (a.length !== 64 || b.length !== 64 || !/^[0-9a-f]{64}$/i.test(a) || !/^[0-9a-f]{64}$/i.test(b)) return false;
   const bufA = Buffer.from(a, "hex");
   const bufB = Buffer.from(b, "hex");
   if (bufA.length !== bufB.length) {

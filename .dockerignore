@@ -10,6 +10,7 @@
 .env
 .env.*
 ops/.env.docker
+kyc-backup*
 
 # Not needed at runtime.
 docs

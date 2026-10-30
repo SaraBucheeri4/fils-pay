@@ -32,6 +32,7 @@ export function AdminLayout() {
         <nav className="admin-nav">
           <NavLink to="/merchants">Merchants</NavLink>
           <NavLink to="/credits">Credits</NavLink>
+          {admin && admin.role !== "support" && <NavLink to="/capture-reviews">Blocked captures</NavLink>}
           <NavLink to="/settlement">Settlement ops</NavLink>
           <NavLink to="/adjustment-imports">Import adjustments</NavLink>
           <NavLink to="/webhooks">Webhook replay</NavLink>

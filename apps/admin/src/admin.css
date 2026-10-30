@@ -36,7 +36,16 @@ code {
 
 .admin-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+}
+
+.admin-capture-table {
+  overflow-x: auto;
+}
+
+.admin-capture-table td {
+  overflow-wrap: anywhere;
 }
 
 .admin-nav a {

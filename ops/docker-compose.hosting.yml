@@ -1,0 +1,66 @@
+# Prepared hosting overlay; requires Compose 2.24.4+. No deployment implied.
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Supply a database password}
+
+  migrate:
+    environment:
+      DATABASE_URL: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+
+  seed:
+    profiles: !override ["local-seed-only"]
+    environment:
+      DATABASE_URL: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+
+  api:
+    ports: !reset []
+    environment:
+      DATABASE_URL: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+      NODE_ENV: production
+      COOKIE_SECURE: "true"
+      OTP_DEV_EXPOSE: "false"
+      RESEND_API_KEY: ${RESEND_API_KEY:?Supply the Resend API key}
+      WEBHOOK_SECRET_ENCRYPTION_KEY: ${WEBHOOK_SECRET_ENCRYPTION_KEY:?Supply a persistent encryption key}
+      ACQUIRER_CALLBACK_SIGNING_SECRET: ${ACQUIRER_CALLBACK_SIGNING_SECRET:?Supply a rotated callback secret}
+      SETTLEMENT_INTERNAL_TOKEN: ${SETTLEMENT_INTERNAL_TOKEN:?Supply an internal service token}
+      CHECKOUT_BASE_URL: https://${WEB_DOMAIN:?Supply the merchant hostname}
+      FEATURE_REFUNDS: "false"
+
+  settlement:
+    environment:
+      DATABASE_URL: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+      PGCONN_SETTLEMENT: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+      SETTLEMENT_INTERNAL_TOKEN: ${SETTLEMENT_INTERNAL_TOKEN:?Supply an internal service token}
+
+  reporting:
+    environment:
+      DATABASE_URL: ${HOSTING_DATABASE_URL:?Supply the internal Postgres URL}
+
+  # One HTTPS gateway serves both built frontends on separate hostnames.
+  web:
+    build: !override
+      context: ..
+      dockerfile: ops/Dockerfile.frontends
+      args:
+        WEB_ORIGIN: https://${WEB_DOMAIN:?Supply the merchant hostname}
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    ports: !override
+      - "80:80"
+      - "443:443"
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?Supply the merchant hostname}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?Supply a distinct admin hostname}
+    volumes:
+      - filspay_caddy_data:/data
+      - filspay_caddy_config:/config
+
+  # The development admin server is replaced by the gateway's static assets.
+  admin:
+    profiles: !override ["local-dev-only"]
+    ports: !reset []
+
+volumes:
+  filspay_caddy_data:
+  filspay_caddy_config:

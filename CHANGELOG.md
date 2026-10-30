@@ -7,6 +7,16 @@ it. Format loosely follows Keep a Changelog.
 ## [Unreleased]
 
 ### Fixed
+- Deliver merchant/admin OTPs through Resend with controlled delivery errors
+  and server-side temporary inbox routing; prevent production code disclosure.
+- Prepare a hosting override with required secrets, private database/API ports,
+  production mode and built frontends behind HTTPS. Runtime release QA remains pending.
+- Reject malformed SHA-256 digests before decoding, neutralize spreadsheet
+  formulas in transaction CSV text, and return 404 for malformed transaction IDs.
+- Remove the batch progress bar whose percentage had no defined target.
+- Add the finance/super-admin blocked-capture screen with bounded paging,
+  original-identity retries and required acquirer evidence before release.
+- Mount durable KYC storage and document backup, migration and restore checks.
 - Keep payment links blocked through unknown capture outcomes across merchant
   capture/void calls; audit review attempts before payment operations and retain
   acquirer confirmation evidence for release.

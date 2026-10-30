@@ -26,6 +26,12 @@ interface TransactionIdParams {
   id: string;
 }
 
+function assertTransactionId(id: string): void {
+  if (id.length !== 36 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    throw new NotFoundError("transaction_not_found");
+  }
+}
+
 /** from/to: ISO-8601 instants (not business dates). Invalid values are rejected with 400. */
 interface ExportQuery {
   status?: string | string[];
@@ -92,6 +98,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     "/:id/capture",
     { preHandler: requireMerchantAuth },
     async (request, reply) => {
+      assertTransactionId(request.params.id);
       const idempotencyKey = getIdempotencyKey(request);
       const { amountFils } = request.body ?? {};
 
@@ -111,6 +118,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     "/:id/void",
     { preHandler: requireMerchantAuth },
     async (request, reply) => {
+      assertTransactionId(request.params.id);
       const result = await voidTransaction(app.db, {
         transactionId: request.params.id,
         merchantId: request.merchantAuth!.merchantId,
@@ -172,6 +180,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     "/:id",
     { preHandler: requireMerchantAuth },
     async (request) => {
+      assertTransactionId(request.params.id);
       const txn = await getTransactionById(app.db, {
         merchantId: request.merchantAuth!.merchantId,
         transactionId: request.params.id,
@@ -187,6 +196,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     "/:id/events",
     { preHandler: requireMerchantAuth },
     async (request) => {
+      assertTransactionId(request.params.id);
       // Same merchant-scoped existence check as the detail route first
       // (404 if the parent transaction isn't found/owned).
       const txn = await getTransactionById(app.db, {

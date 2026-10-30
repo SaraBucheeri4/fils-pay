@@ -129,6 +129,21 @@ deliveries, so any range is fine.
 >
 > **MK:** retry artefact
 
+## Blocked captures
+
+Finance and super admins can open **Blocked captures** (`/capture-reviews`) to
+view unresolved payment-link captures across merchants, 50 at a time. Support
+cannot open the queue or mutate reviews. The API independently enforces roles.
+
+**Retry capture** reuses the original acquirer idempotency key. If the outcome
+remains unknown, the link stays blocked; verify with the acquirer before
+choosing another action. **Review release** requires a confirmation reference
+or note, then **Confirm no charge and release**. The existing API records the
+attempt and release evidence. The screen refreshes after either action,
+including uncertain responses. It never assumes that an error released a link.
+
+Browser verification of this new screen is pending on a disposable stack.
+
 ## If something looks wrong
 
 Check the audit log for who did what, then ask in #fp-ops before reaching

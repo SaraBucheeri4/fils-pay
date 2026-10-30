@@ -11,3 +11,4 @@ reports/
 .codex/
 tmp-go-build/
 .tmp/
+kyc-backup*/

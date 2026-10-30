@@ -94,6 +94,12 @@ services:
       SETTLEMENT_INTERNAL_TOKEN: dev-token
       # Off unless the host sets it; merchants also need the ADR-0009 opt-in.
       FEATURE_REFUNDS: ${FEATURE_REFUNDS:-false}
+      KYC_UPLOAD_DIR: /app/data/kyc
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      OTP_EMAIL_FROM: ${OTP_EMAIL_FROM:-FilsPay <onboarding@resend.dev>}
+      OTP_EMAIL_TO_OVERRIDE: ${OTP_EMAIL_TO_OVERRIDE:-}
+    volumes:
+      - filspay_kyc:/app/data/kyc
     # Wait for the schema, and for the seed when the seed profile is on.
     depends_on:
       migrate:
@@ -169,3 +175,4 @@ services:
 
 volumes:
   filspay_pgdata:
+  filspay_kyc:
