@@ -13,9 +13,11 @@ COPY packages/money packages/money
 COPY apps/web apps/web
 COPY apps/admin apps/admin
 ARG WEB_ORIGIN
+# Path the admin app is served under, for a host without its own admin domain.
+ARG ADMIN_BASE_PATH=/
 # API requests stay same-origin; only the impersonation link needs an origin.
 RUN npm run build -w apps/web
-RUN VITE_WEB_BASE_URL="$WEB_ORIGIN" npm run build -w apps/admin
+RUN VITE_WEB_BASE_URL="$WEB_ORIGIN" npm run build -w apps/admin -- --base="$ADMIN_BASE_PATH"
 
 FROM caddy:2-alpine
 COPY --from=build /app/apps/web/dist /srv/web

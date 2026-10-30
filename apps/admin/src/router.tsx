@@ -33,4 +33,4 @@ export const router = createBrowserRouter([
       { path: "/webhooks/:merchantId", element: <WebhookReplayPage /> },
     ],
   },
-]);
+], { basename: import.meta.env.BASE_URL });
