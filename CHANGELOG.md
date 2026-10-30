@@ -30,8 +30,9 @@ it. Format loosely follows Keep a Changelog.
   hosted checkout, CSV export and webhook test sends.
 
 ### Changed
-- ADR-0020 records that exports, inputs and operator output use Bahrain time
-  (UTC+3). The code changes are tracked as B110-B113 and are not done yet.
+- ADR-0020: exports, inputs and operator output use Bahrain time (UTC+3), B110-B113.
+  The transaction CSV's `occurred_at` now ends in `+03:00` instead of `Z`; the instant
+  is unchanged, but a consumer that matches a trailing `Z` needs updating.
 - Corrected stale documentation against the ADRs: ARCHITECTURE, HANDOVER status
   note, ADR-0002 status, RUNBOOK month-end residue, the May postmortem's root cause,
   and CLAUDE.md. Findings from the dashboard and monitoring review are B102-B116.

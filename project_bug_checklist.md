@@ -1694,7 +1694,7 @@ Postgres, the overlay under Compose, and the redesign in a browser.
 
 ### Bahrain time (ADR-0020)
 
-- [ ] **B110 - Transaction CSV writes occurred_at in UTC** — medium
+- [x] **B110 - Transaction CSV writes occurred_at in UTC** — medium
 
 **Evidence and impact:** Both CSV paths use `occurred_at.toISOString()`, while the new dashboard sidebar says "Times are Bahrain time". The new Export button makes this file easy to reach. The instant is correct and marked `Z`, but a person reading it after 21:00 UTC sees the wrong calendar day.
 
@@ -1702,7 +1702,9 @@ Postgres, the overlay under Compose, and the redesign in a browser.
 
 **Suggested fixes:** Write the same instant with `+03:00`, as ADR-0020 specifies. Check the streaming cursor still uses the database text and not the formatted value. Add coverage in a new test file.
 
-- [ ] **B111 - Credit effective date defaults to the browser's date** — medium, affects ledger dates
+**Fixed:** both CSV paths write `+03:00` through `formatBahrainInstant`; the cursor still reads `occurred_at::text`. Covered by `exportCsv.new.test.ts`. The locked `exportCsv.test.ts` "builds a header plus one line" now fails on purpose because it asserts the old `Z` text (ADR-0020).
+
+- [x] **B111 - Credit effective date defaults to the browser's date** — medium, affects ledger dates
 
 **Evidence and impact:** `todayIso()` in the admin console uses the browser's local date, and its comment admits it. That value is the default credit effective date, and `credits.ts` posts both ledger legs at Bahrain midnight of that date. An operator outside Bahrain near midnight can post a credit to the wrong business day without noticing. ADR-0007 requires Bahrain UI date defaults. Credits already posted are not repaired by a fix.
 
@@ -1710,7 +1712,9 @@ Postgres, the overlay under Compose, and the redesign in a browser.
 
 **Suggested fixes:** Default from the Bahrain date, reusing the offset logic already in the admin `format.ts`.
 
-- [ ] **B112 - Webhook replay window uses browser-local time** — low
+**Fixed:** the default comes from `bahrainToday()` and the input is labelled Bahrain. Credits already posted stay as posted (ADR-0020).
+
+- [x] **B112 - Webhook replay window uses browser-local time** — low
 
 **Evidence and impact:** The replay page's defaults and `new Date(range.from)` read `datetime-local` values in the browser's zone. Operators outside Bahrain replay a different window than the one they typed. `localDateTimeToIso` in the merchant app already reads these as `+03:00`. ADR-0020 decision 3 applies.
 
@@ -1718,13 +1722,17 @@ Postgres, the overlay under Compose, and the redesign in a browser.
 
 **Suggested fixes:** Treat the inputs as Bahrain wall time at both edges and label them so.
 
-- [ ] **B113 - Operator logs carry UTC dates** — low
+**Fixed:** defaults and submitted values both use Bahrain wall time, and the inputs are labelled. Covered by `scripts/adminBahrainInputs.test.ts`.
+
+- [x] **B113 - Operator logs carry UTC dates** — low
 
 **Evidence and impact:** `formatIsoDate` and the duplicate `todayStamp` write UTC dates into API logs, which read a day behind between 00:00 and 03:00 Bahrain. Compose sets no `TZ`, so the settlement daemon's log timestamps are UTC too. Logs only, with no money or merchant-facing effect.
 
 **Code references:** [dateFormat.ts](apps/api/src/lib/dateFormat.ts), [dateUtil.ts](apps/api/src/lib/dateUtil.ts), [docker-compose.yml](ops/docker-compose.yml).
 
 **Suggested fixes:** Use one Bahrain date helper and delete the duplicate. Set `TZ=Asia/Bahrain` on the services, after confirming nothing depends on the process zone. Grafana dashboards already use Asia/Bahrain.
+
+**Fixed:** `formatIsoDate` is the one Bahrain helper and `dateUtil.ts` is gone. `TZ` is set on settlement only, whose Go test failures are identical with and without it. It is deliberately not set on the Node services: they read Postgres `DATE` values through process-local time and pass `Date` parameters to SQL, and their logs need no process zone (pino writes epoch times).
 
 ### Dashboard, lower priority
 
@@ -1759,6 +1767,6 @@ Postgres, the overlay under Compose, and the redesign in a browser.
 | Priority | Items |
 |---|---|
 | High | B102, B103 |
-| Medium | B104, B105, B106, B107, B108, B110, B111 |
-| Low | B109, B112, B113, B114, B115, B116 |
+| Medium | B104, B105, B106, B107, B108 |
+| Low | B109, B114, B115, B116 |
 | Awaiting verification or outside input | B09, B16, B53, B92, B94, B99, B101 |

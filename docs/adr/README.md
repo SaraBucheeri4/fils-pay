@@ -24,4 +24,4 @@ one that supersedes it and update the status line of the old one.
 | 0017 | [Resend OTP email delivery](0017-resend-otp-delivery.md) | Accepted; login verification pending | 2026-10-30 |
 | 0018 | [API-key rotation revokes the original](0018-api-key-rotation-revokes-original.md) | Accepted; database verification pending | 2026-10-30 |
 | 0019 | [Approved local case corrections](0019-approved-local-case-corrections.md) | Accepted; database verification pending | 2026-10-30 |
-| 0020 | [Bahrain time in exports, inputs and operator output](0020-bahrain-time-in-exports-and-operator-output.md) | Accepted; not yet implemented | 2026-10-30 |
+| 0020 | [Bahrain time in exports, inputs and operator output](0020-bahrain-time-in-exports-and-operator-output.md) | Accepted; implemented | 2026-10-30 |

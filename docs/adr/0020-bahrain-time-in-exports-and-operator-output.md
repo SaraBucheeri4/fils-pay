@@ -1,6 +1,6 @@
 # 0020. Bahrain time in exports, inputs and operator output
 
-- **Status:** Accepted; not yet implemented (B110-B113)
+- **Status:** Accepted; implemented (B110-B113)
 - **Date:** 2026-10-30
 - **Decider:** Repository owner, explicit instruction in this session
 - **Extends:** 0007 decision 2. It supersedes nothing.
