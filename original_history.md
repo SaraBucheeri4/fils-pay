@@ -331,6 +331,64 @@ abandoned migrations" from the final message.
 
 ---
 
+## 9. Tests that protect bugs
+
+*Added 2026-10-30 at the repository owner's direction.* Sections 1, 3 and 5 cover
+"every locked test is a vow" and one test by name. This section lists the rest.
+
+**The owner's finding:** some of the locked tests are fraudulent, designed to cover
+up evidence of bugs, and a failure in one of them is not a reason to keep the bug.
+
+**Evidence of intent:**
+
+- `f7a7a3a` (MK), rule 3: *"A failing test means your change is wrong. Never the
+  test. Never the code."*
+- `9567ea0` (YA): *"4.75 BD is 4750 fils. The test says 475. The test is wrong, but
+  the test is scripture."* MK's reply, as YA reports it: *"it is in the tests"*.
+- `a5bffea` (AM): the message says "fix flaky test", but the commit only adds
+  `CHANGELOG.md`.
+- `window_utc_compat_test.go`: *"MK: locks in current behaviour, don't ask."*
+- `initiateMerchantRefund.test.ts`: *"another merchant's existing transactionId
+  should also 404. currently refunds it — am"*. The bug was known and left in.
+- `currentFeeScheduleDisplay.test.ts`: *"am: this test is the reason i asked above.
+  it asserts the backfilled row wins"*.
+
+**Tests that assert the bug.** All fail against the fixed code, and none were edited:
+
+| Test | What it requires | The rule it contradicts |
+|---|---|---|
+| `adjustmentImport.test.ts`, and the valid-CSV route test | "4.75" posts 475 fils | ADR-0001: 4750 fils (B12) |
+| `ledger/refresh_test.go`, 2 tests | Rebuild sets lifetime gross as the balance | ADR-0007: ledger payable (B14) |
+| `TestRecalculateMDR_RecomputesAtCurrentRate` | Rewrites a closed batch's totals | ADR-0010: totals stay frozen (B28) |
+| `reconcile_march.test.ts`, monthBounds | March as a UTC month | ADR-0007: Bahrain month (B27) |
+| `dashboard.test.ts`, dayStartIso | Date filters at the UTC boundary | ADR-0007: Bahrain |
+| `TestSchedulingLocationUsesTZ` | Scheduling zone is UTC | ADR-0007: Bahrain (log estimate) |
+| `acquirerCallbacks.test.ts`, `inboundVerify.test.ts`, unsigned cases | Unsigned callbacks are accepted | ADR-0012: signatures mandatory (B23) |
+| `currentFeeScheduleDisplay.test.ts`, backfill case | Newest-entered rate shows, not the one in effect | B29 |
+| `app.test.ts`, KYC filename case | Judges a PDF by its filename | ARCHITECTURE: detected content type (B81) |
+
+**Limits of this evidence.** The code shows what a test asserts, not why it was
+written. Git author labels are editable and not proof of authorship: several of
+these files carry YA's name, and `ledger/refresh_test.go` is one. Each row above is
+established by its contradiction with a designated source, not by who wrote it.
+
+**Failing or suspicious tests that are not part of this:**
+
+- `TestRunBatch_ValidTokenAndDate` failed honestly. It exposed a real zero-fee
+  regression in the 2026-10-30 fixes, and passes now that it is fixed.
+- The payment-link crash-retry test also failed honestly, and passes now.
+- `parse_cents_compat.test.ts` and `rounding_drift_test.go` carry MK's "don't ask"
+  comment, but assert correct values (4.75 is 4750 fils; half-even rounding).
+- 21 refund tests and 5 loopback webhook tests fail only because their fixtures
+  predate ADR-0009 and the SSRF block. They pass with those policies relaxed.
+- The hard-delete and bulk-KYC audit tests predate ADR-0008.
+- The exact-delay backoff test (B59) is careless, not evidence of a cover-up: it
+  asserts a fixed value from code that deliberately adds jitter.
+
+The tests above stay in place as evidence. They are not edited to make a suite pass.
+
+---
+
 ## Appendix: reproducing the puzzle
 
 ```bash
