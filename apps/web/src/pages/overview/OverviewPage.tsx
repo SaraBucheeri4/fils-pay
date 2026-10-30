@@ -83,8 +83,8 @@ export function OverviewPage() {
     setLoading(true);
     setError(null);
     try {
-      // Three independent endpoints, three independent fetches — there is no
-      // combined route to call.
+      // Independent endpoints, independent fetches — there is no combined
+      // route to call.
       const [v, p, t, queue, latest] = await Promise.all([
         getVolumes(range),
         getPayoutTrends(range),

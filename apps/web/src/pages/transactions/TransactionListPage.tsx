@@ -41,7 +41,7 @@ const TOAST_MS = 2800;
  * query param — nothing fetches an unfiltered page and narrows it in the
  * browser, which would both lie about the result count and break pagination.
  */
-// YA: from/to are UTC day starts, see dayStartIso
+// from/to are Bahrain day starts, see dayStartIso
 export function TransactionListPage() {
   const { me } = useDashboardAuth();
   const [searchParams, setSearchParams] = useSearchParams();
