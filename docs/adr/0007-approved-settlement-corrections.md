@@ -1,6 +1,6 @@
 # 0007. Approved settlement corrections and Bahrain time
 
-- **Status:** Accepted; implementation outstanding
+- **Status:** Accepted; implemented, no historical repair
 - **Date:** 2026-10-30
 - **Decider:** Repository owner, explicit instructions in this session
 - **Supersedes:** 0003's UTC calendar-month exception; 0004's different console rebuild source

@@ -44,8 +44,8 @@ function toBatchDateString(d: Date): string {
 }
 
 /**
- * Maps a settlement_batches row to its DTO. Invariant (enforced by the Go
- * worker at close): netPayoutFils === grossFils - feeFils for every batch.
+ * Maps a settlement_batches row to its DTO. Under ADR-0010 netPayoutFils is
+ * max(0, grossFils - feeFils + carry), not simply grossFils - feeFils.
  */
 function serializeBatch(row: SettlementBatchRow): SettlementBatchDto {
   return {
@@ -339,6 +339,73 @@ export async function getReconciliationReport(
     gapFils,
     explained: gapFils === 0,
   };
+}
+
+export interface BatchIntegrityMismatch {
+  batchId: string;
+  batchDate: string;
+  actual: { grossFils: number; feeFils: number; netPayoutFils: number };
+  expected: { grossFils: number; feeFils: number; netPayoutFils: number };
+}
+
+/**
+ * Separate from reconciliation, which ADR-0010 keeps attributing activity to
+ * its original window: checks each closed batch's frozen totals against the
+ * activity it claimed, using the fees actually journaled. A batch that paid
+ * the wrong amount shows here even when reconciliation has no gap.
+ */
+export async function getBatchIntegrityReport(
+  pool: Pool,
+  input: { merchantId: string; from: string; to: string },
+): Promise<{ periodFrom: string; periodTo: string; batchesChecked: number; mismatches: BatchIntegrityMismatch[] }> {
+  const result = await pool.query<{
+    id: string; batch_date: Date; gross_fils: string; fee_fils: string; net_payout_fils: string;
+    expected_gross: string; expected_fee: string; expected_net: string;
+  }>(
+    `WITH batches AS (
+       SELECT * FROM settlement_batches
+        WHERE merchant_id = $1 AND status <> 'open' AND batch_date >= $2::date AND batch_date < $3::date
+     ), claimed AS (
+       SELECT b.id,
+         COALESCE((SELECT SUM(te.amount_fils) FROM transaction_events te
+           WHERE te.settlement_batch_id = b.id AND te.event_type IN ('captured','partially_captured')), 0)
+         - COALESCE((SELECT SUM(r.amount_fils) FROM refunds r
+           WHERE r.settlement_batch_id = b.id AND r.status = 'succeeded'), 0) AS gross,
+         COALESCE((SELECT SUM(COALESCE((te.metadata->>'feeFils')::bigint,
+             (SELECT COALESCE(SUM(CASE WHEN l.direction = 'credit' THEN l.amount_fils ELSE -l.amount_fils END), 0)
+                FROM ledger_entries l
+               WHERE l.transaction_id = te.transaction_id AND l.account_id = 'platform_fee_revenue'
+                 AND l.occurred_at = te.occurred_at AND l.description LIKE 'capture%')))
+           FROM transaction_events te
+           WHERE te.settlement_batch_id = b.id AND te.event_type IN ('captured','partially_captured')), 0)
+         - COALESCE((SELECT SUM(l.amount_fils) FROM ledger_entries l
+           WHERE l.merchant_id = $1 AND l.account_id = 'platform_fee_revenue' AND l.direction = 'debit'
+             AND l.description = 'capture: negotiated discount adjustment'
+             AND (SELECT te.settlement_batch_id FROM transaction_events te
+                   WHERE te.transaction_id = l.transaction_id AND te.event_type IN ('captured','partially_captured')
+                   ORDER BY te.occurred_at DESC, te.id DESC LIMIT 1) = b.id), 0)
+         - COALESCE((SELECT SUM(r.fee_reversed_fils) FROM refunds r
+           WHERE r.settlement_batch_id = b.id AND r.status = 'succeeded'), 0)
+         + COALESCE((SELECT SUM(c.fee_delta_fils) FROM settlement_fee_corrections c
+           WHERE c.settlement_batch_id = b.id), 0) AS fee
+       FROM batches b
+     )
+     SELECT b.id, b.batch_date, b.gross_fils, b.fee_fils, b.net_payout_fils,
+            c.gross::text AS expected_gross, c.fee::text AS expected_fee,
+            GREATEST(0, c.gross - c.fee + b.carry_in_fils)::text AS expected_net
+       FROM batches b JOIN claimed c USING (id)
+      ORDER BY b.batch_date, b.id`,
+    [input.merchantId, input.from, input.to],
+  );
+  const mismatches: BatchIntegrityMismatch[] = [];
+  for (const row of result.rows) {
+    const actual = { grossFils: Number(row.gross_fils), feeFils: Number(row.fee_fils), netPayoutFils: Number(row.net_payout_fils) };
+    const expected = { grossFils: Number(row.expected_gross), feeFils: Number(row.expected_fee), netPayoutFils: Number(row.expected_net) };
+    if (actual.grossFils !== expected.grossFils || actual.feeFils !== expected.feeFils || actual.netPayoutFils !== expected.netPayoutFils) {
+      mismatches.push({ batchId: row.id, batchDate: toBatchDateString(row.batch_date), actual, expected });
+    }
+  }
+  return { periodFrom: input.from, periodTo: input.to, batchesChecked: result.rows.length, mismatches };
 }
 
 export interface SettlementSummaryDto {

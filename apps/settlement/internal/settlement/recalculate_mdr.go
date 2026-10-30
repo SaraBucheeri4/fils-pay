@@ -17,7 +17,8 @@ import (
 // recalculation pass.
 //
 // DiffFils is NewFeeFils - OldFeeFils. A positive diff means the merchant was
-// undercharged at close. The implementation updates historical batch figures (B28).
+// undercharged at close. Batch figures stay frozen; the diff is a new journal
+// with a pending settlement claim (ADR-0010).
 type BatchAdjustment struct {
 	BatchID    uuid.UUID
 	BatchDate  time.Time
@@ -63,15 +64,9 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 	if err != nil {
 		return RecalcResult{}, err
 	}
+	// ADR-0014: the volume tier is not a merchant term, so it never creates a
+	// correction on a past batch.
 	mdrBps = EffectiveMdrBpsAt(schedules, time.Now(), mdrBps)
-	platformVolume, err := ReadAndLockPlatformProcessedFils(ctx, tx)
-	if err != nil {
-		return RecalcResult{}, err
-	}
-	mdrBps -= VolumeTierMdrBonusBps(platformVolume)
-	if mdrBps < 0 {
-		mdrBps = 0
-	}
 
 	rows, err := tx.Query(ctx, `
 		SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils

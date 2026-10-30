@@ -6,6 +6,7 @@ export type AdminAuditAction =
   | "api_key_rotate"
   | "settlement_run_batch"
   | "balance_rebuild"
+  | "payment_link_capture_review"
   | "webhook_batch_replay"
   | "webhook_delivery_archive_create"
   | "webhook_delivery_archive_replay"

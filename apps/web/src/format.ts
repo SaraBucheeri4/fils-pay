@@ -22,6 +22,11 @@ export function dateTime(iso: string | null | undefined): string {
   return iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Bahrain" }) : "—";
 }
 
+/** Bahrain time of day, independent of the browser timezone. */
+export function timeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Bahrain" });
+}
+
 /** A date input is a Bahrain business date, serialized as an absolute instant. */
 export function dayStartIso(dateValue: string): string | undefined {
   return dateValue ? new Date(`${dateValue}T00:00:00.000+03:00`).toISOString() : undefined;

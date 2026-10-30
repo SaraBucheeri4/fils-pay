@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatBhd, parseBhdToFils, toFils } from "@filspay/money";
+import { dateOnly, dateTime } from "../../format.js";
 import { getMerchant, recomputeTransactionStatuses, submitKycReview } from "../../api/merchants.js";
 import { adjustBalance } from "../../api/balanceAdjustments.js";
 import { issueCredit } from "../../api/credits.js";
@@ -271,7 +272,7 @@ export function MerchantDetailPage() {
         <dt>Mode</dt>
         <dd>{merchant.testMode ? "test" : "live"}</dd>
         <dt>Created</dt>
-        <dd>{new Date(merchant.createdAt).toLocaleString()}</dd>
+        <dd>{dateTime(merchant.createdAt)}</dd>
         {profile ? (
           <>
             <dt>Legal name</dt>
@@ -299,7 +300,7 @@ export function MerchantDetailPage() {
       {detail.balance ? (
         <p>
           Cached payable: <strong>{bhd(detail.balance.cachedPayableFils)}</strong> (updated{" "}
-          {new Date(detail.balance.updatedAt).toLocaleString()}). The ledger remains authoritative;
+          {dateTime(detail.balance.updatedAt)}). The ledger remains authoritative;
           this figure is a cache, rebuildable from Settlement ops.
         </p>
       ) : (
@@ -462,7 +463,7 @@ export function MerchantDetailPage() {
                 <td>{review.outcome}</td>
                 <td>{review.reviewerIdentifier}</td>
                 <td>{review.notes ?? "-"}</td>
-                <td>{new Date(review.reviewedAt).toLocaleString()}</td>
+                <td>{dateTime(review.reviewedAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -510,9 +511,9 @@ export function MerchantDetailPage() {
                   <code>{key.prefix}</code>
                 </td>
                 <td>{key.label ?? "-"}</td>
-                <td>{new Date(key.createdAt).toLocaleDateString()}</td>
-                <td>{key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : "never"}</td>
-                <td>{key.revokedAt ? new Date(key.revokedAt).toLocaleString() : "-"}</td>
+                <td>{dateOnly(key.createdAt)}</td>
+                <td>{key.lastUsedAt ? dateTime(key.lastUsedAt) : "never"}</td>
+                <td>{key.revokedAt ? dateTime(key.revokedAt) : "-"}</td>
                 <td>
                   {key.revokedAt ? null : (
                     <RequireRole
@@ -582,7 +583,7 @@ export function MerchantDetailPage() {
                 <td>
                   <code>{endpoint.secretPrefix}</code>
                 </td>
-                <td>{new Date(endpoint.createdAt).toLocaleDateString()}</td>
+                <td>{dateOnly(endpoint.createdAt)}</td>
               </tr>
             ))}
           </tbody>

@@ -115,10 +115,7 @@ func main() {
 			onlyMerchant = &id
 		}
 
-		report, err := settlement.RunDailyBatch(ctx, pool, businessDate, onlyMerchant)
-		if err != nil {
-			log.Fatalf("settlement run-batch: %v", err)
-		}
+		report, runErr := settlement.RunDailyBatch(ctx, pool, businessDate, onlyMerchant)
 		fmt.Printf("run-batch: business date %s, %d merchant(s) processed\n", *dateFlag, len(report.MerchantResults))
 		for _, r := range report.MerchantResults {
 			fmt.Printf("  merchant=%s batch=%s alreadyClosed=%v alreadyPaid=%v gross=%d fee=%d netPayout=%d\n",
@@ -135,9 +132,13 @@ func main() {
 			log.Fatalf("settlement run-batch: enqueue payout notifications: %v", err)
 		}
 		fmt.Printf("run-batch: enqueued %d settlement.paid event(s)\n", enqueued)
+		// Merchants that succeeded are reported and notified before a partial
+		// failure fails the command.
+		if runErr != nil {
+			log.Fatalf("settlement run-batch: %d merchant(s) failed: %v", len(report.Failures), runErr)
+		}
 
-	// YA: CLI rebuild goes from ledger_entries. the admin button goes somewhere else, see internalapi
-	// MK: same thing, different source. both fine.
+	// ADR-0007: the CLI and the console rebuild share the same ledger calculation.
 	case "rebuild-balances":
 		fs := flag.NewFlagSet("rebuild-balances", flag.ExitOnError)
 		merchantFlag := fs.String("merchant", "", "merchant UUID (optional; omit to rebuild every merchant)")

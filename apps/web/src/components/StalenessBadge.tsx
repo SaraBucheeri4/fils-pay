@@ -1,3 +1,4 @@
+import { timeOfDay } from "../format.js";
 /**
  * Renders the `readModelAsOf`/`live` pair every analytics response carries.
  * Staleness in this platform is a disclosed property, not a
@@ -31,7 +32,7 @@ export function StalenessBadge({
   }
   return (
     <span className="dash-badge dash-badge-stale">
-      Data as of {new Date(readModelAsOf).toLocaleTimeString()}
+      Data as of {timeOfDay(readModelAsOf)}
     </span>
   );
 }

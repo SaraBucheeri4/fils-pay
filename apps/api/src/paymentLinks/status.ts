@@ -19,6 +19,8 @@ export interface PaymentLinkStatusInput {
   status: string;
   expiresAt: Date;
   reservedAt: Date | null;
+  /** ADR-0013: a capture may have charged the buyer; never claimable again. */
+  captureAttemptAt?: Date | null;
 }
 
 // FH: uses Date.now() not the client time — should this use expiryReferenceTime too?
@@ -35,6 +37,7 @@ export function derivePublicStatus(
   }
 
   // row.status === 'reserved'
+  if (row.captureAttemptAt) return "processing";
   const reservedAtMs = row.reservedAt?.getTime() ?? 0;
   const stillReserved = reservedAtMs > Date.now() - reservationTimeoutSeconds * 1000;
   return stillReserved ? "processing" : "active";

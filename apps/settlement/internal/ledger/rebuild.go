@@ -1,6 +1,6 @@
-// Package ledger rebuilds merchant_balances from ledger_entries. Nothing
-// automatic calls this — the incremental path is in internal/balances.
-// This is for the manual `rebuild-balances` CLI subcommand.
+// Package ledger rebuilds merchant_balances from ledger_entries. Called by the
+// `rebuild-balances` CLI, the console button and the daemon's 02:00 refresh.
+// The per-merchant refresh after a close or payout is in internal/balances.
 package ledger
 
 import (
@@ -49,9 +49,8 @@ func (d RebuildDiff) Changed() bool {
 // RebuildAllBalances recomputes every merchant's balance the same way and
 // overwrites merchant_balances in one transaction. Returns the full
 // before/after map so a caller (the rebuild-balances CLI subcommand) can
-// print exactly what changed. The only function in this codebase that
-// writes merchant_balances from a full ledger recompute rather than an
-// incremental delta.
+// print exactly what changed. A rebuild is what resets ADR-0006 display
+// corrections, so it also zeroes the stored display adjustment (ADR-0011).
 func RebuildAllBalances(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]RebuildDiff, error) {
 	tx, err := db.Begin(ctx)
 	if err != nil {
@@ -74,7 +73,7 @@ func RebuildAllBalances(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]Re
     ), updated AS (
       INSERT INTO merchant_balances (merchant_id, cached_payable_fils, updated_at)
       SELECT merchant_id, balance, now() FROM totals WHERE true
-      ON CONFLICT (merchant_id) DO UPDATE SET cached_payable_fils = EXCLUDED.cached_payable_fils, updated_at = now()
+      ON CONFLICT (merchant_id) DO UPDATE SET cached_payable_fils = EXCLUDED.cached_payable_fils, display_adjustment_fils = 0, updated_at = now()
       RETURNING merchant_id, cached_payable_fils
     ) SELECT u.merchant_id, COALESCE(b.cached_payable_fils,0), u.cached_payable_fils
       FROM updated u LEFT JOIN before b USING (merchant_id)`)

@@ -250,7 +250,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Manually confirmed in a browser (2026-10-29):** merchant dashboard login with password + OTP as `owner@gammahospitality.example` (transactions list loads, 25 rows, amounts shown in 3-decimal BHD); admin console login as `superadmin@filspay.test` (merchant list loads). Credentialed CORS for a separately hosted api remains unimplemented; it is only needed if the frontends are ever deployed on a different origin from the api.
 
-- [ ] **B10 — Settlement does not close at Bahrain midnight**
+- [x] **B10 — Settlement does not close at Bahrain midnight**
 
 **Category:** Business timing.
 
@@ -266,7 +266,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Status (2026-10-29): confirmed by simulation.** Replaying `runIfDue`'s logic across a Bahrain midnight: at 00:05–02:59 Bahrain it re-runs the day before yesterday (an idempotent no-op), and it first closes yesterday at 03:00 Bahrain (00:00 UTC). The 15-minute delay never takes effect. Window boundaries themselves (`BusinessDayWindow`) are correct when given a Bahrain date.
 
-- [ ] **B11 — Net payout calculation uses float32 dinars**
+- [x] **B11 — Net payout calculation uses float32 dinars**
 
 **Category:** Money correctness.
 
@@ -282,7 +282,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Status (2026-10-29): confirmed.** With the same arithmetic as `NetPayableFils`, gross 98,765,432 and fee 2,469,136 fils give 96,296,297 instead of 96,296,296: one fil overpaid. Smaller batches tested exact.
 
-- [ ] **B12 — CSV adjustment amounts use a two-decimal parser**
+- [x] **B12 — CSV adjustment amounts use a two-decimal parser**
 
 **Category:** Money correctness.
 
@@ -298,7 +298,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Status (2026-10-29): confirmed by code path.** `parseAdjustmentAmountFils` calls `parseDecimalMinor(raw)` with its default of 2 decimals, so `"4.75"` (the format ADMIN.md tells finance to use) becomes 475 fils = 0.475 BD, ten times too small.
 
-- [ ] **B14 — Admin and CLI balance rebuilds use different sources**
+- [x] **B14 — Admin and CLI balance rebuilds use different sources**
 
 **Category:** Accounting correctness / policy conflict.
 
@@ -316,7 +316,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Test locks in the bug:** `TestRebuildBalances_ValidToken` ([server_test.go](apps/settlement/internal/internalapi/server_test.go)) seeds a batch with gross 12,000 and net payout 11,700, then *requires* the rebuilt balance to be 12,000 (gross). It passes because the code is wrong. Per the working rules, this test must not dictate the fix; add a replacement test in a new file when B14 is resolved.
 
-- [ ] **B15 — Scheme residue is not posted during batch close**
+- [x] **B15 — Scheme residue is not posted during batch close**
 
 **Category:** Accounting correctness.
 
@@ -346,7 +346,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **B16-envelope update (2026-10-30):** Explicit refund.succeeded envelope mapping, signed delivery support and Bahrain-dated reporting consumption have the previously recorded integration coverage. Eligibility was added with those implementations, not by itself. The owner confirmed the current producer contract as the shared baseline; coordination acknowledgement is no longer outstanding. B16 remains open for refund/accounting release blockers outside this owner's scope; the public route remains disabled. See docs/security-refund-handoff.md.
 
-- [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **high: confirmed code-path race; historical causation not independently established**
+- [x] **B18 — Slow payment attempts allow two buyers to pay one link** — **high: confirmed code-path race; historical causation not independently established**
 
 **Category:** Duplicate charge.
 
@@ -387,7 +387,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 - The handler ([callbacks.ts](apps/api/src/acquirer/callbacks.ts)) only inserts into `acquirer_callback_notes`, whose `callback_type` is CHECK-constrained to `'fraud_review.completed'`, and its own docblock says it does not change transaction status or the ledger. A redelivered callback therefore duplicates a **note**, never a capture. The postmortem's root cause ("the second application produced a second capture") cannot happen in this code; the doubles came from B18.
 - Severity stays medium: duplicate timeline evidence, not money movement. Still fix with the suggested database uniqueness, and record the false fix claims in the CHANGELOG/postmortem corrections alongside B18.
 
-- [ ] **B20 — Concurrent refunds can return money twice**
+- [x] **B20 — Concurrent refunds can return money twice**
 
 **Category:** Refund concurrency; latent release blocker while the public route returns501.
 
@@ -401,7 +401,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B21 and B16. A lock only during validation is insufficient if it is released without a durable reservation.
 
-- [ ] **B21 — Refund limits use authorization instead of captured funds**
+- [x] **B21 — Refund limits use authorization instead of captured funds**
 
 **Category:** Refund amount validation; latent release blocker while the public route returns501.
 
@@ -429,7 +429,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B16 and B24. Check compatibility for receivers previously canonicalizing bodies and document the raw-body contract.
 
-- [x] **B23 — Inbound callback verification permits unsigned or stale messages**
+- [ ] **B23 — Inbound callback verification permits unsigned or stale messages**
 
 **Category:** Callback authentication.
 
@@ -471,7 +471,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B11 establishes the correct parent total. Use the existing allocation algorithm as reference; frozen money packages are not implicitly authorized for edits.
 
-- [ ] **B26 — Exported scheme amounts differ from stored scheme fils**
+- [x] **B26 — Exported scheme amounts differ from stored scheme fils**
 
 **Category:** Money representation.
 
@@ -485,7 +485,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B15 and B27. Preserve evidence of files already sent and reconcile historical differences before any re-export.
 
-- [ ] **B27 — March reconciliation posts duplicate corrections on rerun**
+- [x] **B27 — March reconciliation posts duplicate corrections on rerun**
 
 **Category:** Reconciliation idempotency.
 
@@ -499,7 +499,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B15, B26 and B10. Resolve the documented monthly-window conflict and review existing postings; repair duplicates with explicit compensating entries.
 
-- [ ] **B28 — MDR recalculation rewrites frozen paid batch totals**
+- [x] **B28 — MDR recalculation rewrites frozen paid batch totals**
 
 **Category:** Historical accounting.
 
@@ -513,7 +513,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B08, B13, B14 and B16. Coordinate settlement/report consumption; merely stopping the UPDATE would leave corrections unpaid.
 
-- [ ] **B29 — Displayed current fee uses entry date instead of effective date**
+- [x] **B29 — Displayed current fee uses entry date instead of effective date**
 
 **Category:** Pricing visibility.
 
@@ -605,7 +605,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B32 and B34. Test writes through merchant endpoints for every admin role, including expired and disabled-admin grants.
 
-- [ ] **B36 — Transaction CSV exports load the full result into memory**
+- [x] **B36 — Transaction CSV exports load the full result into memory**
 
 **Category:** Resource use.
 
@@ -633,7 +633,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B22 and B24. Existing archive format needs a compatibility/migration plan; this is split from the large-export source entry.
 
-- [ ] **B38 — Existing streaming export cursor can skip transactions**
+- [x] **B38 — Existing streaming export cursor can skip transactions**
 
 **Category:** Latent export correctness.
 
@@ -1011,7 +1011,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B35. Test each admin role starting a grant and attempting a merchant write.
 
-- [ ] **B66 — Capture applies the discount after MDR; settlement applies it before**
+- [x] **B66 — Capture applies the discount after MDR; settlement applies it before**
 
 **Category:** Money correctness.
 
@@ -1198,7 +1198,7 @@ Removed from active confirmed-bug remediation; IDs retained to preserve referenc
 
 **Dependencies / verification:** None.
 
-- [ ] **B65 — A fully refunded partial capture becomes refundable again**
+- [x] **B65 — A fully refunded partial capture becomes refundable again**
 
 **Category:** Duplicate B21 scenario: latent amount-bound defect, not an established status-policy bug.
 
@@ -1239,7 +1239,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Include transaction ID in canonical request identity; test cross-resource reuse.
 
-- [ ] **B70 - Checkout omits negotiated discount adjustment**
+- [x] **B70 - Checkout omits negotiated discount adjustment**
 
 **Evidence and impact:** Only the transaction route invokes applyCaptureDiscountAdjustment; payment-link pay calls captureTransaction directly without that adjustment.
 
@@ -1343,7 +1343,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Define measured pixel/concurrency limits for container capacity. This is a resource risk, not a confirmed exploit.
 
-- [ ] **B83 - Refund reversal ignores discounted fee debits**
+- [x] **B83 - Refund reversal ignores discounted fee debits**
 
 **Evidence and impact:** Latent: query sums fee-revenue credits only, ignoring discount debits. Independent partial rounding also lacks cumulative reversed-fee accounting. Public route remains501.
 
@@ -1389,7 +1389,7 @@ Review of a1e19d7 and the proposed follow-up. These entries distinguish confirme
 
 **Verification:** Five read-only probes against current source with mocked database responses confirmed the refund gap delta, absent schedule/tier reads, NULL/false/true enablement behavior, missing serialized field, and unsupported refund envelope. No real database or acquirer was called. All three source edits preserve comment-free compiled output. Full npm and Windows Go-short attempts were blocked by sandbox spawn/cache access errors; no integration pass is claimed. Results: reports/refund-followup-probes.json and reports/refund-followup-*.log.
 
-- [ ] **B88 - Reconciliation pending omits refund effects**
+- [x] **B88 - Reconciliation pending omits refund effects**
 
 **Category:** Confirmed report-model gap; latent refund release blocker.
 
@@ -1474,3 +1474,45 @@ preserved TestSchedulingLocationUsesTZ expects UTC and conflicts with the
 required Bahrain behavior. Database races, export pages, fresh/upgrade
 migrations, carry integration and downstream end-to-end tests are unverified.
 No staging/production work, deployment, or historical data repair occurred.
+
+
+## Post-review follow-up (2026-10-30)
+
+Independent verification of the auth, webhook, reporting and finance work on
+disposable Postgres, with a separate database per suite. No staging or
+production access, deployment or historical repair. Decisions are in ADR-0011
+to ADR-0014.
+
+**Newly ticked, with database evidence:** B10, B11, B12, B14, B15, B18, B20, B21,
+B26, B27, B28, B29, B36, B38, B65, B66, B70, B83 and B88. Fresh install applies
+83 migrations; a seeded database upgrades cleanly; three concurrent closes across
+139 seeded days produced no duplicates or unbalanced groups.
+
+**Reopened:** B23. Verification uses re-serialized JSON and the acquirer's signed
+format is undocumented, so a correctly signed body with different bytes is
+rejected. Do not change this before the acquirer confirms the format (ADR-0012).
+
+| Found in review | Change |
+|---|---|
+| Close charged fee 0 where the journal description was not `capture:` or no fee was recorded; on seed data a merchant was overpaid 559,270 fils | Uses a journaled fee or snapshot, otherwise ARCHITECTURE's rate. Same data now charges 559,270 and payable ends at 0 |
+| Reconciliation cannot see a wrong batch, by ADR-0010's design | Report unchanged; added GET /v1/settlement/batch-integrity |
+| Acquirer error on capture let a second buyer be charged (B18) | ADR-0013: durable attempt record and review |
+| Superseded or refused attempts left a live hold | Authorization voided |
+| Crash-retry left a link reserved after a replayed capture | Finalized under the current claim |
+| One merchant's error stopped the whole daily run | Run continues, then reports failures |
+| Admin date default wrong 00:00-03:00 Bahrain; 12 browser-local timestamps | Bahrain in admin and web (ADR-0007) |
+| A batch close wiped display adjustments | ADR-0011 |
+| Recalculation applied the volume tier | ADR-0014 |
+
+**Still open:**
+- Finance's written decision on the capture volume tier; a tier-priced capture still charges 235 instead of 250 on 10000 fils.
+- The acquirer's signature format (B23).
+- No console screen yet for capture reviews or batch integrity; both are API only.
+- Transaction CSV `occurred_at` is still a UTC instant. Whether ADR-0007's display rule covers this file format needs a decision.
+- Three seeded batches (Alpha, Beta, Delta Wholesale, 2026-08-31) carry totals with no claimed activity. They are fixture data, reported by the integrity check, and account for those merchants' reconciliation gaps.
+- Not exercised: browser UI, a real acquirer, the refund route with FEATURE_REFUNDS on, negative batches through the reporting consumer.
+
+**Failing locked tests that remain and why, none edited:**
+- API: 21 refund tests with NULL refunds_enabled (ADR-0009; all pass with opt-in on), 5 loopback webhook tests (B63; pass with the block relaxed), 5 callback tests (ADR-0012), 4 adjustment tests expecting 600 fils for "6.00" (ADR-0001), and one each for KYC filename (ARCHITECTURE), fee display (B29), bulk KYC and webhook delete (ADR-0008), and backoff jitter (B59).
+- Go: 2 rebuild tests expecting lifetime gross (ADR-0007), 1 expecting UTC scheduling (ADR-0007), 1 expecting a rewritten paid batch (ADR-0010).
+- Web and scripts: 1 each expecting UTC boundaries (ADR-0007).

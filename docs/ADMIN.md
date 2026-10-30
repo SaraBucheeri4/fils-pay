@@ -55,7 +55,7 @@ from last month, pick the effective date the credit belongs to.
 has confirmed the right figure (statement, phone call), enter the difference
 and a reason. This is a display-only cache correction with an audit record
 (ADR-0006); it creates no ledger posting and changes no settlement obligation.
-A rebuild resets it. Use Rebuild, then Adjust. Finance-approved money
+It lasts until the next rebuild, including the nightly 02:00 refresh (ADR-0011). Use Rebuild, then Adjust. Finance-approved money
 corrections require a separate balanced journal, counter-account and reason.
 
 **Recalculate MDR** — after a merchant's rate changes, run this over the
@@ -86,6 +86,14 @@ merchant at once. The nightly recompute does the same thing at 02:00 Bahrain tim
 **Rebuild analytics** — dashboards lag a little behind live activity by
 design. If they look stale, rebuild them from scratch here instead of
 waiting for the worker. Quick, safe, and repeatable.
+
+**Payment-link capture reviews** — if the acquirer errored during a checkout
+capture, the card may have been charged, so the link stays blocked (ADR-0013).
+There is no console screen yet. Finance or a super admin lists them with
+`GET /v1/admin/merchants/:id/payment-links/capture-reviews` and resolves one with
+`POST /v1/admin/merchants/:id/payment-links/:linkId/capture-review`. Use
+`retry_capture` to resend the same acquirer key, or `release` only once the
+acquirer has confirmed no charge.
 
 ## Webhooks
 

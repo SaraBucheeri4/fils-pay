@@ -9,6 +9,11 @@ import {
 } from "../admin/merchants.js";
 import { rotateApiKeyAsAdmin } from "../admin/apiKeys.js";
 import { startImpersonation } from "../admin/impersonation.js";
+import {
+  listPaymentLinkCaptureReviews,
+  resolvePaymentLinkCaptureReview,
+  type CaptureReviewResolution,
+} from "../paymentLinks/captureReview.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { BadRequestError, NotFoundError, UnauthorizedError } from "../lib/errors.js";
 import { recordKycReviewInTx } from "../onboarding/review.js";
@@ -169,6 +174,44 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
       });
 
       reply.code(200).send(result);
+    },
+  );
+
+  /** ADR-0013: payment links blocked because a capture outcome is unknown. */
+  app.get<{ Params: MerchantIdParams }>(
+    "/:id/payment-links/capture-reviews",
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
+    async (request) => {
+      assertUuidParam(request.params.id, "merchant_not_found");
+      return {
+        reviews: await listPaymentLinkCaptureReviews(
+          app.db,
+          request.params.id,
+          app.config.paymentLinkReservationTimeoutSeconds,
+        ),
+      };
+    },
+  );
+
+  app.post<{ Params: { id: string; linkId: string }; Body: { resolution?: CaptureReviewResolution } }>(
+    "/:id/payment-links/:linkId/capture-review",
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
+    async (request) => {
+      const adminAuth = request.adminAuth;
+      if (!adminAuth) throw new UnauthorizedError("unauthenticated");
+      assertUuidParam(request.params.id, "merchant_not_found");
+      assertUuidParam(request.params.linkId, "capture_review_not_found");
+      const resolution = request.body?.resolution;
+      if (resolution !== "retry_capture" && resolution !== "release") {
+        throw new BadRequestError("invalid_request", "resolution must be retry_capture or release");
+      }
+      return resolvePaymentLinkCaptureReview(app.db, app.acquirer, {
+        merchantId: request.params.id,
+        linkId: request.params.linkId,
+        adminUserId: adminAuth.adminUserId,
+        resolution,
+        timeoutSeconds: app.config.paymentLinkReservationTimeoutSeconds,
+      });
     },
   );
 

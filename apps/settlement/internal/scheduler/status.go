@@ -13,14 +13,8 @@ import (
 	"time"
 )
 
-// schedulingLocation is the zone this log estimate renders in. Reads the
-// process's TZ setting (the same convention every other timestamp this
-// service logs already follows via Go's default time formatting), falling
-// back to the container's local zone when TZ is unset — kept independent
-// of internal/settlement's own businessDayLocation, which is a private
-// var of that package and not reachable from here.
-// FH: reads TZ, container has TZ unset, so these log lines say UTC. confusing but log-only
-// MK: DO NOT use this for anything but logs.
+// schedulingLocation is the fixed Asia/Bahrain zone (UTC+3, no DST) used for
+// the daemon's business dates and log estimates, independent of the process TZ.
 func schedulingLocation() *time.Location { return time.FixedZone("Asia/Bahrain", 3*60*60) }
 
 // estimateNextRunAt gives a rough, log-only estimate of the daemon's next

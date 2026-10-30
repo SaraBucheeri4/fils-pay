@@ -1,5 +1,6 @@
 // Package balances refreshes the ledger-authoritative payable cache after
-// settlement operations. ADR-0006 display corrections remain cache-only.
+// settlement operations. ADR-0006 display corrections remain cache-only and,
+// per ADR-0011, survive this refresh; only a rebuild resets them.
 package balances
 
 import (
@@ -28,7 +29,7 @@ func refresh(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID) erro
 	}
 	_, err := tx.Exec(ctx, `UPDATE merchant_balances SET cached_payable_fils = (
    SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
-   FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'),
+   FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable') + display_adjustment_fils,
    last_settlement_batch_id = $2, updated_at = now() WHERE merchant_id = $1`, merchantID, batchID)
 	return err
 }

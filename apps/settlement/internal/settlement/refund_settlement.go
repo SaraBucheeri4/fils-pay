@@ -96,10 +96,14 @@ func carryPayout(net, carry money.Fils) (money.Fils, money.Fils, error) {
 	return available, 0, nil
 }
 
-// Legacy discounts were separate postings without a capture-event identity.
-// A whole transaction's fee is exact from its journal; an ambiguous legacy
-// transaction spanning batches requires separate historical review.
-func actualCaptureFees(ctx context.Context, tx pgx.Tx, txnID uuid.UUID, events []eligibleEvent) (money.Fils, error) {
+// actualCaptureFees returns the fee actually charged on these capture events:
+// a journaled fee leg or the capture's feeFils snapshot, where a snapshot of 0
+// is a genuine zero fee. With neither, no charge was recorded at all, so
+// ARCHITECTURE's rate rule prices the event rather than paying it fee-free.
+// Legacy discounts were separate postings without a capture-event identity:
+// a whole transaction's fee is exact from its journal, while an ambiguous
+// legacy transaction spanning batches requires separate historical review.
+func actualCaptureFees(ctx context.Context, tx pgx.Tx, merchantID, txnID uuid.UUID, events []eligibleEvent) (money.Fils, error) {
 	var eventCount int
 	var charged int64
 	var discounted bool
@@ -107,13 +111,13 @@ func actualCaptureFees(ctx context.Context, tx pgx.Tx, txnID uuid.UUID, events [
   (SELECT count(*) FROM transaction_events WHERE transaction_id = $1 AND event_type IN ('captured','partially_captured')),
   (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END),0)
     FROM ledger_entries WHERE transaction_id = $1 AND account_id = 'platform_fee_revenue'
-      AND description LIKE 'capture:%'),
+      AND description LIKE 'capture%'),
   EXISTS (SELECT 1 FROM ledger_entries WHERE transaction_id = $1
     AND account_id = 'platform_fee_revenue' AND description = 'capture: negotiated discount adjustment')`, txnID).Scan(&eventCount, &charged, &discounted)
 	if err != nil {
 		return 0, err
 	}
-	if eventCount == len(events) {
+	if eventCount == len(events) && (charged != 0 || allHaveFeeSnapshot(events)) {
 		return money.Fils(charged), nil
 	}
 	var total money.Fils
@@ -138,13 +142,44 @@ func actualCaptureFees(ctx context.Context, tx pgx.Tx, txnID uuid.UUID, events [
 		var fee int64
 		if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END),0)
     FROM ledger_entries WHERE transaction_id = $1 AND account_id = 'platform_fee_revenue'
-    AND occurred_at = $2 AND description LIKE 'capture:%'`, txnID, e.occurredAt).Scan(&fee); err != nil {
+    AND occurred_at = $2 AND description LIKE 'capture%'`, txnID, e.occurredAt).Scan(&fee); err != nil {
 			return 0, err
 		}
-		total, err = addFinancialFils(total, money.Fils(fee))
+		eventFee := money.Fils(fee)
+		if fee == 0 {
+			eventFee, err = unrecordedEventFee(ctx, tx, merchantID, e)
+			if err != nil {
+				return 0, err
+			}
+		}
+		total, err = addFinancialFils(total, eventFee)
 		if err != nil {
 			return 0, err
 		}
 	}
 	return total, nil
+}
+
+func allHaveFeeSnapshot(events []eligibleEvent) bool {
+	for _, e := range events {
+		if e.feeFils == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// unrecordedEventFee applies ARCHITECTURE's rate rule at the event's own time:
+// fee_schedules, falling back to merchants.mdr_bps, with the discount reducing
+// the amount the MDR is charged on. The volume tier is not part of that rule.
+func unrecordedEventFee(ctx context.Context, tx pgx.Tx, merchantID uuid.UUID, e eligibleEvent) (money.Fils, error) {
+	var mdrBps, discountBps int64
+	if err := tx.QueryRow(ctx, `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`, merchantID).Scan(&mdrBps, &discountBps); err != nil {
+		return 0, err
+	}
+	schedules, err := LoadFeeSchedules(ctx, tx, merchantID)
+	if err != nil {
+		return 0, err
+	}
+	return ComputeSettlementFee(e.amountFils, EffectiveMdrBpsAt(schedules, e.occurredAt, mdrBps), discountBps), nil
 }

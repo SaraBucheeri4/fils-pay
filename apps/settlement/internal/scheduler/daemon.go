@@ -89,8 +89,7 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 
 	report, err := settlement.RunDailyBatch(ctx, db, businessDate, nil)
 	if err != nil {
-		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err)
-		return
+		log.Printf("settlement daemon: RunDailyBatch(%s): %d merchant(s) failed: %v", businessDate.Format("2006-01-02"), len(report.Failures), err)
 	}
 	log.Printf("settlement daemon: RunDailyBatch(%s) processed %d merchant(s)", businessDate.Format("2006-01-02"), len(report.MerchantResults))
 

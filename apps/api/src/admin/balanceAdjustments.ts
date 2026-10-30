@@ -21,7 +21,8 @@ export interface BalanceAdjustmentResult {
   cachedPayableFilsAfter: Fils;
 }
 
-/** Applies a correction to a merchant's balance record and audits it. */
+/** ADR-0006 display correction: cache only, no ledger. ADR-0011 tracks it
+ *  separately so it survives settlement refreshes until the next rebuild. */
 export async function applyBalanceCorrection(
   pool: Pool,
   input: BalanceAdjustmentInput,
@@ -39,7 +40,8 @@ export async function applyBalanceCorrection(
 
     const updated = await client.query<{ cached_payable_fils: string }>(
       `UPDATE merchant_balances
-          SET cached_payable_fils = cached_payable_fils + $2, updated_at = now()
+          SET cached_payable_fils = cached_payable_fils + $2,
+              display_adjustment_fils = display_adjustment_fils + $2, updated_at = now()
         WHERE merchant_id = $1
       RETURNING cached_payable_fils`,
       [input.merchantId, input.deltaFils],

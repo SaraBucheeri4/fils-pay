@@ -69,6 +69,13 @@ type runBatchResponse struct {
 	MerchantResults []merchantBatchOutcomeResponse `json:"merchantResults"`
 }
 
+// runBatchFailedResponse names merchants whose close or payout failed. The
+// others in the pass were still processed.
+type runBatchFailedResponse struct {
+	Error             string   `json:"error"`
+	FailedMerchantIDs []string `json:"failedMerchantIds"`
+}
+
 // rebuildDiffResponse is the JSON projection of ledger.RebuildDiff.
 //
 // After uses the same authoritative ledger calculation as the CLI.
@@ -232,8 +239,12 @@ func handleRunBatch(pool *pgxpool.Pool) http.Handler {
 
 		report, err := settlement.RunDailyBatch(r.Context(), pool, businessDate, onlyMerchant)
 		if err != nil {
-			log.Printf("settlement internal api: run-batch(%s) failed: %v", body.Date, err)
-			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "run_batch_failed"})
+			log.Printf("settlement internal api: run-batch(%s): %d merchant(s) failed: %v", body.Date, len(report.Failures), err)
+			failed := make([]string, 0, len(report.Failures))
+			for _, f := range report.Failures {
+				failed = append(failed, f.MerchantID.String())
+			}
+			writeJSON(w, http.StatusInternalServerError, runBatchFailedResponse{Error: "run_batch_failed", FailedMerchantIDs: failed})
 			return
 		}
 

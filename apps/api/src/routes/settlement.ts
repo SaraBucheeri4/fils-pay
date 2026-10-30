@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { requireMerchantAuth, requireMerchantRole } from "../auth/requireMerchantAuth.js";
 import { NotFoundError, BadRequestError } from "../lib/errors.js";
 import {
+  getBatchIntegrityReport,
   getReconciliationReport,
   getSettlementBatch,
   getSettlementSummary,
@@ -70,6 +71,19 @@ export async function settlementRoutes(app: FastifyInstance): Promise<void> {
         from,
         to,
       });
+    },
+  );
+
+  // Static segment, registered before "/batches/:id" like "/reconciliation".
+  app.get<{ Querystring: ReconciliationQuery }>(
+    "/batch-integrity",
+    { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] },
+    async (request) => {
+      const { from, to } = request.query;
+      if (!from || !to) {
+        throw new BadRequestError("invalid_request", "from and to (YYYY-MM-DD) are required");
+      }
+      return getBatchIntegrityReport(app.db, { merchantId: request.merchantAuth!.merchantId, from, to });
     },
   );
 

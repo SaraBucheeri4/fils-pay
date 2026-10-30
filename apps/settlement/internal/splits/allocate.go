@@ -29,7 +29,7 @@ type ChildShare struct {
 // PayoutBatch's own result shape (settlement.PayoutResult) so the two are
 // interchangeable from RunDailyBatch's point of view.
 //
-// Child shares currently round independently and may not conserve the batch total (B25).
+// ChildShares conserves the batch total: Shares sum exactly to net_payout_fils.
 type SplitPayoutResult struct {
 	BatchID          uuid.UUID
 	ParentMerchantID uuid.UUID

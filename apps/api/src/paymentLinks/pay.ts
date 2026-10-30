@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { toFils } from "@filspay/money";
 import { authorizeTransaction } from "../payments/authorize.js";
 import { captureTransaction } from "../payments/capture.js";
+import { voidTransaction } from "../payments/void.js";
 import type { AcquirerSimulator, SimulatedCardInput } from "../acquirer/types.js";
 
 export interface PayPaymentLinkInput {
@@ -47,6 +48,8 @@ export function expiryReferenceTime(submittedAt?: string): Date {
  * Each reservation has its own identity. Capture locks and validates that
  * identity before contacting the acquirer, then marks the link paid in the
  * same transaction. A timed-out authorization cannot capture a newer claim.
+ * Once a capture attempt starts, its outcome must be known before anyone else
+ * can be charged (ADR-0013); see captureReview.ts for resolving an unknown one.
  */
 export async function payPaymentLink(
   pool: Pool,
@@ -65,7 +68,8 @@ export async function payPaymentLink(
       WHERE token = $1
         AND (
              status = 'active'
-             OR (status = 'reserved' AND reserved_at < now() - ($2 || ' seconds')::interval)
+             OR (status = 'reserved' AND capture_attempt_at IS NULL
+                 AND reserved_at < now() - ($2 || ' seconds')::interval)
             )
         AND expires_at > $3
       RETURNING id, merchant_id, amount_fils, reference, reservation_id`,
@@ -108,12 +112,25 @@ export async function payPaymentLink(
 
   const txnId = (authResult.body as { id: string }).id;
 
-  // NOTE: discountAdjustment is applied by the transactions route only, not here — FH
-  // Step 3 — capture (full amount, immediately). amountFils omitted =>
-  // capture the full remaining amount — always correct here, since this
-  // transaction was just authorized for exactly link.amountFils and
-  // nothing else could have touched it yet.
   const captureKey = `paylink:${link.id}:${input.idempotencyKey}:capture`;
+
+  // ADR-0013: record the attempt durably before the acquirer can move money.
+  // From here the link cannot be re-claimed, even after a crash, until the
+  // outcome is known. Zero rows means a newer claim replaced this one.
+  const attempt = await pool.query(
+    `UPDATE payment_links
+        SET capture_attempt_at = now(), capture_attempt_transaction_id = $3, capture_attempt_idempotency_key = $4
+      WHERE id = $1 AND status = 'reserved' AND reservation_id = $2`,
+    [link.id, claimedRow.reservation_id, txnId, captureKey],
+  );
+  if (attempt.rowCount === 0) {
+    await voidUncapturedAuthorization(pool, txnId, link);
+    return { statusCode: 409, body: { stage: "capture", error: "payment_link_attempt_superseded" } };
+  }
+
+  // Step 3 — capture the full amount; discount-before-MDR pricing and the
+  // link's paid state both commit inside captureTransaction. An exception or
+  // a 5xx leaves the outcome unknown, so the attempt stays recorded for review.
   const captureResult = await captureTransaction(pool, acquirer, {
     paymentLinkClaim: { linkId: link.id, reservationId: claimedRow.reservation_id },
     transactionId: txnId,
@@ -122,7 +139,16 @@ export async function payPaymentLink(
     actor: { type: "system", id: link.id },
   });
 
+  if (captureResult.statusCode >= 500) {
+    return {
+      statusCode: captureResult.statusCode,
+      body: { stage: "capture", ...(captureResult.body as Record<string, unknown>) },
+    };
+  }
+
   if (captureResult.statusCode !== 200) {
+    // A definite refusal: no money moved, so return the authorization and the link.
+    await voidUncapturedAuthorization(pool, txnId, link);
     await releaseReservation(pool, link.id, claimedRow.reservation_id);
     return {
       statusCode: captureResult.statusCode,
@@ -130,23 +156,23 @@ export async function payPaymentLink(
     };
   }
 
-  // Capture finalizes the link atomically while holding its attempt lock.
-  const finalizeResult = await pool.query<{ id: string; paid_at: Date }>(
-    `SELECT id, paid_at FROM payment_links WHERE id = $1 AND status = 'paid' AND transaction_id = $2`,
-    [link.id, txnId]);
+  // Normally capture already marked the link paid. A replayed capture from an
+  // attempt that crashed before that existed finalizes here, under this claim.
+  const finalizeResult = await pool.query<{ paid_at: Date }>(
+    `UPDATE payment_links
+        SET status = 'paid', paid_at = COALESCE(paid_at, now()), transaction_id = $2, reserved_at = NULL,
+            capture_attempt_at = NULL, capture_attempt_transaction_id = NULL, capture_attempt_idempotency_key = NULL
+      WHERE id = $1 AND (status = 'paid' AND transaction_id = $2 OR status = 'reserved' AND reservation_id = $3)
+      RETURNING paid_at`,
+    [link.id, txnId, claimedRow.reservation_id],
+  );
 
   const finalized = finalizeResult.rows[0];
-  // FH: this IS reachable — if capture takes past the reservation timeout a second request re-claims,
-  // pays and finalizes first; we land here, answer 200, and the card was charged twice
   if (!finalized) {
-    // Should be unreachable in normal operation (this request is the only
-    // holder of the reservation). The acquirer-side capture genuinely
-    // succeeded and money moved; failing to *record* that fact against the
-    // link is a data-consistency bug to surface loudly, not a reason to
-    // tell a customer whose card was actually charged that their payment
-    // failed.
+    // The acquirer capture succeeded and money moved, so the buyer must not be
+    // told the payment failed. A link that cannot record it is a data defect.
     console.error(
-      `payPaymentLink: finalize UPDATE matched 0 rows for link ${link.id} after a successful capture ` +
+      `payPaymentLink: finalize matched 0 rows for link ${link.id} after a successful capture ` +
         `(transaction ${txnId}) — invariant violation, investigate`,
     );
     return {
@@ -166,13 +192,27 @@ export async function payPaymentLink(
   };
 }
 
+/** Voids an authorization this attempt will never capture, releasing its hold.
+ *  A failure is logged: the caller's response must not depend on it. */
+async function voidUncapturedAuthorization(
+  pool: Pool,
+  transactionId: string,
+  link: { id: string; merchantId: string },
+): Promise<void> {
+  try {
+    await voidTransaction(pool, { transactionId, merchantId: link.merchantId, actor: { type: "system", id: link.id } });
+  } catch (err) {
+    console.error(`payPaymentLink: could not void authorization ${transactionId} for link ${link.id}`, err);
+  }
+}
+
 /**
- * Used by both decline branches above. Guarded by `status =
+ * Used by the definite-refusal branches above. Guarded by `status =
  * 'reserved'` for the same reason as the finalize UPDATE: this request
  * only ever releases the reservation it itself holds.
  */
 async function releaseReservation(pool: Pool, linkId: string, reservationId: string): Promise<void> {
-  await pool.query(`UPDATE payment_links SET status = 'active', reserved_at = NULL, reservation_id = NULL WHERE id = $1 AND status = 'reserved' AND reservation_id = $2`, [
+  await pool.query(`UPDATE payment_links SET status = 'active', reserved_at = NULL, reservation_id = NULL, capture_attempt_at = NULL, capture_attempt_transaction_id = NULL, capture_attempt_idempotency_key = NULL WHERE id = $1 AND status = 'reserved' AND reservation_id = $2`, [
     linkId, reservationId,
   ]);
 }

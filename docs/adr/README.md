@@ -11,7 +11,11 @@ one that supersedes it and update the status line of the old one.
 | 0004 | [Balance cache rebuild source](0004-balance-rebuild-source.md) | Superseded by 0007 | 2026-05-30 |
 | 0005 | [Settlement v2 and the shadow ledger](0005-settlement-v2-shadow-ledger.md) | Proposed (paused) | 2026-05-18 |
 | 0006 | [Adjustments are display corrections, not postings](0006-display-adjustments.md) | Accepted | 2026-05-04 |
-| 0007 | [Approved settlement corrections and Bahrain time](0007-approved-settlement-corrections.md) | Accepted; implementation outstanding | 2026-10-30 |
+| 0007 | [Approved settlement corrections and Bahrain time](0007-approved-settlement-corrections.md) | Accepted; implemented, no historical repair | 2026-10-30 |
 | 0008 | [Admin security and webhook retention](0008-admin-security-and-webhook-retention.md) | Accepted | 2026-10-30 |
 | 0009 | [Refunds require explicit merchant opt-in](0009-refund-enablement.md) | Accepted | 2026-10-30 |
 | 0010 | [Negative settlement carry](0010-refund-settlement-carry.md) | Accepted | 2026-10-30 |
+| 0011 | [Display adjustments last until a rebuild](0011-display-adjustments-survive-settlement.md) | Accepted | 2026-10-30 |
+| 0012 | [Acquirer callback signatures are mandatory](0012-mandatory-acquirer-callback-signatures.md) | Accepted | 2026-10-30 |
+| 0013 | [Unknown capture outcomes block a payment link](0013-payment-link-unknown-capture-outcome.md) | Accepted | 2026-10-30 |
+| 0014 | [MDR recalculation ignores the volume tier](0014-volume-tier-excluded-from-recalculation.md) | Accepted; interim pending finance | 2026-10-30 |

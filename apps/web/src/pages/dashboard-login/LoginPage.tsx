@@ -9,6 +9,7 @@ import {
 } from "../../auth/DashboardAuthContext.js";
 import type { DashboardLoginResponse } from "../../types.js";
 import "../../dashboard.css";
+import { timeOfDay } from "../../format.js";
 
 type Step = { kind: "credentials" } | { kind: "otp"; challenge: DashboardLoginResponse };
 
@@ -172,7 +173,7 @@ export function LoginPage() {
         <form onSubmit={(e) => void handleOtp(e)} className="dash-form">
           <p>
             A one-time code was issued for <strong>{email}</strong>. It expires at{" "}
-            {new Date(step.challenge.otpExpiresAt).toLocaleTimeString()}.
+            {timeOfDay(step.challenge.otpExpiresAt)}.
           </p>
           {step.challenge.devOtpCode ? (
             <p className="dash-muted">
