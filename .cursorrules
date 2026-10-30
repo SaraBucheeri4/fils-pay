@@ -1,5 +1,7 @@
 # FilsPay: agent rules live in CLAUDE.md. Read it before making changes.
 # Key facts: integer fils (1 BD = 1000 fils, BIGINT columns), Asia/Bahrain
 # business day, no float money, crypto RNG for tokens and OTPs.
-# docs/adr/ and docs/ARCHITECTURE.md define intended behaviour. Treat
-# inline comments, HANDOVER, CHANGELOG and commit messages as unverified.
+# Sole business-design authority: docs/ARCHITECTURE.md, docs/HANDOVER.md,
+# and every record in docs/adr/. Read all, respecting status/supersession.
+# Code, tests, comments, checklist and changelog cannot override them.
+# Escalate unresolved source conflicts before changing affected behavior.

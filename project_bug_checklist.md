@@ -4,13 +4,22 @@ Prepared 2026-10-29; source-audited 2026-10-30. The originally cited bugs.md is 
 
 Mark an item complete only when the fix and its dependent behavior have been verified. Integration decisions are tracked separately from confirmed implementation defects. No production-data repair is authorized by this checklist.
 
+**Business-design authority (user instruction):** docs/ARCHITECTURE.md,
+docs/HANDOVER.md and every docs/adr/ record are the sole sources of truth for
+intended behavior. This checklist is implementation evidence and proposed work,
+not independent business authority. Read all designated sources, honor explicit
+ADR status/supersession, and obtain an explicit resolution of remaining source
+conflicts before changing affected behavior. Do not choose by author or use
+current code/tests to override a designated document. Finance/provider input
+must be captured in an approved update to those sources before changing rules.
+
 ## Current source audit - 2026-10-30
 
 - Reviewed original B01-B68 against current source/schema and historical evidence. Old test/reproduction statements are author-reported historical records, not fresh results.
 - Removed from active defects: B07-B09 (integration scope), B13 (explicit display-only policy), B17 (documented client-clock policy), B30 (approximate monitoring), B54 (fixture hygiene, no established data exposure). B65 is consolidated into B21, not an unconditional status-change requirement.
 - B56 is resolved by current guide edits; B57 false checksum assurance is corrected without adding checksums. B03 is repaired code awaiting account-kind approval. B59 remains open because replacement coverage does not retire its original failing test.
 - Qualified B10/B14/B18/B26/B35/B45/B48/B49/B52/B53/B58/B60/B64/B66: removed false authority, unsupported causal/authorship claims and unconditional contract choices. Go's discount order is not established business authority.
-- Added distinct gaps B69-B87. Existing entries cover related SSRF, paid-history, impersonation and approval problems, so those were not duplicated.
+- Added distinct gaps B69-B87; follow-up B88-B91 adds refund reconciliation, rate inputs, the NULL policy conflict and missing response field. Existing entries cover related SSRF, paid-history, impersonation and approval problems, so those were not duplicated.
 - Comment cleanup changes no executable financial/authentication behavior. No staging/production access or data repair is authorized by this audit.
 - Verification: comment-free TypeScript compiler output is identical in 55 changed TS/TSX files; executable Go tokens are identical in 6 files; Compose non-comment content is unchanged. All 87 checklist IDs occur once. Full npm test attempt hit sandbox spawn EPERM; Go test -short hit denied build-cache access. DATABASE_URL is unset, so no database integration pass is claimed. Logs are in reports/checklist-audit-*-test.log.
 
@@ -36,7 +45,7 @@ The source file named above, `bugs.md`, does not exist in this repository or its
 
 - Money amounts must remain whole fils; no floating-point money calculations. Resolve existing decimal input/export contracts explicitly rather than silently changing units.
 - Daily settlement starts at midnight Asia/Bahrain (UTC+3), closing the completed business day.
-- Use executable paths/schema for actual behavior and approved requirements for intended behavior. Cross-check documents and attributed comments; conflicting policies are not automatically defects.
+- Use executable paths/schema to establish actual behavior, and only ARCHITECTURE.md, HANDOVER.md and all ADRs to establish intended behavior. A checklist suggestion cannot override those sources; unresolved conflicts require explicit resolution.
 - Respect existing money-package and test-file freezes. Identify any approval or policy change needed before implementation; a test preserving a bug must not dictate incorrect business behavior.
 - Check migration deployment history before changing existing migration files. Fresh-install and upgrade paths both need validation.
 
@@ -274,6 +283,8 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 **Why this approach:** Prevents exposing a refund button that moves money but leaves settlement or reconciliation inconsistent.
 
 **Dependencies / verification:** B20, B21, B22 and B23 before activation; coordinate B28 and B39. Add envelope support before enabling a new dispatcher event type.
+
+**Explicit release gate B16-envelope:** buildEnvelope currently handles transaction.captured, transaction.voided and settlement.paid only. Passing refund.succeeded throws unsupported-event-type. Dispatcher eligibility currently excludes it, so this is dormant, not a live blocked queue. Define the public refund envelope and tests before adding eligibility; adding only the event type would roll back delivery creation. This gate is recorded here rather than duplicated as another standalone bug.
 
 - [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **high: confirmed code-path race; historical causation not independently established**
 
@@ -1309,3 +1320,55 @@ No production or disposable-database integration reproduction is claimed for the
 **Code references:** [cancel.ts](apps/api/src/webhooks/cancel.ts), [0022](db/migrations/0022_webhook_deliveries.sql), [0068](db/migrations/0068_webhook_delivery_archives.sql).
 
 **Suggested fixes:** Agree explicit disable/delete/retention semantics; preserve audit history and test an endpoint with deliveries/archives. Do not silently cascade-delete evidence.
+
+## Refund follow-up review - 2026-10-30
+
+Review of a1e19d7 and the proposed follow-up. These entries distinguish confirmed code gaps from an unresolved policy note. The public refund route still returns 501; no refund activation or financial-data repair is authorized here.
+
+**Verification:** Five read-only probes against current source with mocked database responses confirmed the refund gap delta, absent schedule/tier reads, NULL/false/true enablement behavior, missing serialized field, and unsupported refund envelope. No real database or acquirer was called. All three source edits preserve comment-free compiled output. Full npm and Windows Go-short attempts were blocked by sandbox spawn/cache access errors; no integration pass is claimed. Results: reports/refund-followup-probes.json and reports/refund-followup-*.log.
+
+- [ ] **B88 - Reconciliation pending omits refund effects**
+
+**Category:** Confirmed report-model gap; latent refund release blocker.
+
+**Evidence and impact:** getReconciliationReport includes refund debit/fee-reversal legs in merchant-payable ledger net, but its pending query selects only captured/partially_captured events. Settlement close likewise does not claim refund events. An otherwise unchanged unbatched refund therefore changes the calculated gap without a corresponding pending adjustment. For example, a 1000-fils refund with 50-fils fee reversal reduces payable net by 950; that incremental -950 is absent from pending. This does not prove every refund must yield a nonzero gap: other postings, period boundaries and existing discrepancies may offset it.
+
+**Code references:** [query.ts](apps/api/src/settlement/query.ts), [processRefund.ts](apps/api/src/payments/processRefund.ts), [batch.go](apps/settlement/internal/settlement/batch.go).
+
+**Suggested fixes:** Agree the refund-to-payout accounting lifecycle under B16, represent unbatched refund gross and actual net fee reversal once, and reconcile the same business window without double-counting. Test the change in gap before/after a refund and its later settlement, separately from unrelated report defects.
+
+**Dependencies / verification:** B16, B20, B21, B44, B83. Source-reviewed; no database reproduction in this pass.
+
+- [ ] **B89 - Reconciliation pending ignores effective fee schedules and platform tier**
+
+**Category:** Confirmed pricing-input mismatch, separate from B49/B66 rounding/formula disputes.
+
+**Evidence and impact:** Pending rows contain amount_fils only; the report reads merchants.mdr_bps and negotiated_discount_bps once, then calls estimateFeeFils. It never resolves fee_schedules at the capture instant or calls the tier resolver. Migration0046 creates settlement_batch_splits, not a merchant-rate synchronization trigger. A search of migration trigger definitions finds no claimed synchronization. Thus even after repairing B49 arithmetic, scheduled/tier-discounted captures can have a different pending net than the report. This affects reconciliation estimates, not evidence that this query changes charged fees.
+
+**Code references:** [query.ts](apps/api/src/settlement/query.ts), [feeSchedule.ts](apps/api/src/fees/feeSchedule.ts), [platformVolumeTier.ts](apps/api/src/fees/platformVolumeTier.ts), [0046](db/migrations/0046_settlement_batch_splits.sql), [0048](db/migrations/0048_fee_schedules.sql).
+
+**Suggested fixes:** Use authoritative per-capture financial postings/fee snapshots where available, or resolve the approved fee inputs at the correct event time. Do not substitute today's tier for a historical capture's actual fee. Coordinate the choice with B66/B70 rather than automatically declaring either formula correct.
+
+**Dependencies / verification:** B49, B66, B70, B88. The nonexistent-trigger and same-rate comments were removed; executable code is unchanged.
+
+- [ ] **B90 - Refund enablement NULL policy contradicts an attributed migration note**
+
+**Category:** Documentation/policy conflict; release decision, not a proven runtime implementation bug.
+
+**Evidence and impact:** assertRefundsNotOnHold rejects only refunds_enabled === false. NULL and true permit the helper to proceed. Migration0052's introduction also says NULL means no hold. Its later note labelled '-- y:' says NULL means disabled until explicit enablement. That label is not verified authorship or authority. The code behavior is unambiguous; the intended launch opt-in policy is not established by the contradictory note.
+
+**Code references:** [initiateMerchantRefund.ts](apps/api/src/refunds/initiateMerchantRefund.ts), [0052](db/migrations/0052_merchants_refunds_enabled.sql).
+
+**Decision needed:** Confirm whether enablement is an explicit opt-in or a pause switch, document the true/false/NULL truth table, and test each state before B16 launches. Do not silently flip existing NULL rows or change financial authorization from an unverified comment. The applied migration is preserved as historical evidence.
+
+- [ ] **B91 - Transaction serialization omits refundedFils**
+
+**Category:** Confirmed response-contract gap; relevant before refund UI launch.
+
+**Evidence and impact:** transactions.refunded_fils exists after0043 and processRefund updates it, but TransactionRow/TransactionDto/serializeTransaction omit the field. The frontend TransactionDto omits it too. Transaction reads therefore do not expose the cumulative returned amount needed to display captured-minus-refunded availability. The refund helper's own refundedTotalFils response is not a substitute for later transaction reads. UI-computed availability must remain informational; server validation still needs B20/B21.
+
+**Code references:** [serialize.ts](apps/api/src/transactions/serialize.ts), [types.ts](apps/web/src/types.ts), [0043](db/migrations/0043_transactions_refunded_fils.sql), [processRefund.ts](apps/api/src/payments/processRefund.ts).
+
+**Suggested fixes:** Expose cumulative refundedFils consistently in row projection, serializer, API/client types and read responses, with schema-deployment compatibility. Test zero, partial and full refunds. Keep pending refund reservations distinct if they are added; never infer server authorization solely from the displayed balance.
+
+**Dependencies / verification:** B16, B20, B21, B68. Only misleading comments were corrected here; response behavior is unchanged.

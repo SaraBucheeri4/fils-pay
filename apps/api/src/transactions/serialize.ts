@@ -15,8 +15,8 @@ export interface TransactionRow {
 
 /**
  * Public transaction shape. `amountFils` is the authorized amount and
- * `capturedFils` the cumulative captured amount; the refundable balance is
- * derived by the client as capturedFils - refundedFils.
+ * `capturedFils` the cumulative captured amount. refundedFils is not yet
+ * exposed, so clients cannot derive remaining refundable funds (B91).
  */
 export interface TransactionDto {
   id: string;

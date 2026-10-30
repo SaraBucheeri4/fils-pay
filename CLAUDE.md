@@ -1,10 +1,105 @@
-# FilsPay: YA-attributed guidance
+# FilsPay: operating rules and YA-attributed history
+
+## Sole sources of truth for intended business behavior
+
+By the user's instruction, the only authoritative business-design sources are:
+
+- docs/ARCHITECTURE.md
+- docs/HANDOVER.md
+- Every record under docs/adr/, read in full, including status and supersession.
+
+This guide, the checklist, code, schema, tests, comments, commit messages,
+changelog and other documents do not override those sources. Code and tests
+show actual implementation; a mismatch is evidence to investigate, not a
+replacement business rule. Author attribution does not change authority:
+do not exclude a designated source because MK, AM, FH or YA contributed to it.
+
+Honor an accepted ADR's explicit supersession only within its stated scope.
+Read proposed/paused ADRs as proposed work, not evidence a feature is approved
+or implemented. If designated sources still contradict one another, identify
+the exact conflicting passages and obtain an explicit resolution before
+changing the affected behavior. Record an approved change in those sources
+(a superseding ADR for an accepted decision); never silently choose by author,
+code behavior, passing tests or checklist wording. External finance/provider
+input must be reflected in an approved source update before it changes the rule.
+
+Known document conflicts requiring care include HANDOVER versus ADR-0003 on
+reconciliation months, HANDOVER/ARCHITECTURE versus ADR-0004 on rebuild paths,
+HANDOVER versus ARCHITECTURE on credit posting dates, and HANDOVER versus
+ADR-0002 on whether residue posting is already implemented. Implementation
+status claims must not be mistaken for proof a requirement is satisfied.
 
 This guide limits historical business guidance to statements attributed to
 Yousif Al-Ansari (YA), with their sources. Attribution is not proof of
 authorship or correctness: the history is constructed, HANDOVER was moved
 and annotated by MK, and ARCHITECTURE explicitly lists later editors.
-Nothing below claims that YA wrote this replacement guide.
+Nothing below claims that YA wrote this replacement guide. The operating
+rules below are current repository safeguards, not quotations from YA.
+
+## Operating rules for a fresh session
+
+- Work against a local, disposable stack only. Never point tools at staging
+  or production. Inspect the target of DATABASE_URL before any command that
+  writes fixtures, migrations, seeds or financial records; never print its
+  credentials. An unset URL is not a successful integration-test setup.
+- Read all designated sources above before changing business behavior.
+  Check CHANGELOG.md and project_bug_checklist.md for historical evidence and
+  existing findings, not additional authority. Resolve B66 through the
+  designated sources before changing the financial formula.
+- Money is integer fils: 1 BD = 1000 fils. The monetary schema convention is
+  BIGINT and Go money.Fils is int64; legacy exceptions such as the INTEGER
+  platform counter are tracked defects, not permission to narrow amounts.
+  Use parseBhdToFils for BHD text, applyRateFils for basis-point rates and
+  formatBhd for display. Preserve half-to-even integer rounding; do not use
+  floats or parseFloat for financial calculations. The two-decimal external
+  scheme format is an explicit exception, not a change to internal units.
+- Preserve packages/money and apps/settlement/internal/money. Monetary
+  behavior changes require finance approval. Keep existing regression-locked
+  tests intact unless explicitly authorized; add coverage in new test files.
+  A passing test does not establish the business rule or excuse a known bug.
+- Do not edit applied migrations. Add upgrade migrations after checking
+  deployment history. Filename tracking currently has no checksum enforcement.
+- Session/API-key/bearer-token and OTP randomness must use cryptographic
+  generators. This current security rule is not attributed to YA. Seeded test
+  fixtures and retry jitter have different randomness requirements.
+- Keep POST /v1/refunds disabled until the refund release blockers are
+  resolved together. Adding refund.succeeded to a type list does not implement
+  an envelope, reporting consumer, settlement adjustment or safe refund.
+  Pending resolution of B66 in the designated sources, refund accounting uses the net fee
+  actually charged by the relevant capture path, including discount debit
+  legs, with cumulative partial-refund limits (B70/B83). Do not recompute a
+  historical fee from a newly selected formula or today's merchant rate.
+- The seed TRUNCATEs merchants with CASCADE and can erase linked data (B52).
+  Recalculate MDR rewrites paid batch totals (B28). Re-running reconcile_march
+  can post another correction (B27); it is not an idempotent inspection tool.
+  Do not run these against valuable data or as routine verification. No data
+  repair, schema deployment, commit, or auth/money behavior change is authorized
+  merely by reading this guide; obtain explicit authorization when needed.
+- Do not dump db/seed/fixtures/production_seed.sql into context: it is roughly
+  15 MB. Use targeted rg searches and bounded excerpts when relevant.
+
+## Verification commands and baseline limits
+
+- Run checks appropriate to the change, then the full suite before declaring
+  a behavioral change complete: npm test, followed by go test ./... from
+  apps/settlement. On Windows use go test -short ./... for the documented
+  integration-test caveat; record that reduced scope.
+- Scoped commands include npm test -w apps/api and go test ./internal/settlement/
+  from apps/settlement. npm run typecheck checks the TypeScript workspaces,
+  database tooling and scripts. Database tests require a migrated disposable
+  Postgres; npm run migrate writes schema and must target that database only.
+- Isolate workspace test fixtures by database/schema, or reset a disposable
+  database between suites. Running sequentially alone does not prevent B60
+  contamination. Never seed or migrate an unverified shared database to test.
+- Historical checklist records report API 391/392, with B59's original jitter
+  assertion still failing; reporting 7/11 after contamination and 11/11 clean.
+  Those figures are historical, not a fresh guaranteed baseline. Do not restore
+  the unsupported 36/167 failure count. Establish and record actual failures
+  for the current checkout before attributing them to a change.
+- The last source audit could not complete normal suites because of sandbox
+  spawn/cache errors and no configured disposable DATABASE_URL. Compiler/token
+  equivalence checks verified comment-only edits, not database integration.
+  Report skipped/blocked checks explicitly; never label them passing.
 
 ## YA's stated approach
 
@@ -45,10 +140,11 @@ Nothing below claims that YA wrote this replacement guide.
   that INTEGER is safe "while it's only a counter" is not reliable evidence
   of adequate capacity for cumulative fils.
 
-## Contradictions in YA-attributed statements
+## Discrepancies between documented statements and implementation
 
-These are historical claims to investigate, not instructions to reproduce
-the current behavior or permission to change financial/security logic.
+The designated documents remain authoritative for intended behavior. This
+table records observed mismatches; it does not demote HANDOVER or authorize
+the code to override it. Resolve conflicts between designated documents first.
 
 | YA-attributed claim | Conflicting evidence |
 |---|---|

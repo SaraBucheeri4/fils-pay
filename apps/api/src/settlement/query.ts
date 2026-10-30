@@ -245,8 +245,8 @@ export async function listBatchTransactions(
 
 /**
  * gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils -
- * pendingUnbatchedFils. Refund legs are included both in the ledger figure
- * and in pending, so a period with refunds still explains to zero.
+ * pendingUnbatchedFils. Pending currently includes only capture events;
+ * refund ledger effects are not represented there (B88).
  */
 export interface ReconciliationReport {
   periodFrom: string;
@@ -271,9 +271,8 @@ function bahrainLocalMidnightUtc(dateStr: string): Date {
 /**
  * @param input.from  inclusive business date (YYYY-MM-DD)
  * @param input.to    exclusive business date (YYYY-MM-DD)
- * @returns explained === true iff gapFils === 0. The pending figure is
- *          computed with the same rate the capture path used, including
- *          the effective-dated fee schedule and the platform volume tier.
+ * @returns explained === true iff gapFils === 0. Pending currently uses
+ *          merchant defaults rather than effective fee schedules/tier (B89).
  */
 export async function getReconciliationReport(
   pool: Pool,
@@ -312,8 +311,6 @@ export async function getReconciliationReport(
     ),
   ]);
 
-  // MK: merchants.mdr_bps is kept in sync with the current fee_schedules row by the 0046 trigger,
-  // so reading it here is the same as resolving the schedule
   const merchant = merchantResult.rows[0];
   const mdrBps = merchant?.mdr_bps ?? 0;
   const discountBps = merchant?.negotiated_discount_bps ?? 0;
