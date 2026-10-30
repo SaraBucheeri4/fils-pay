@@ -8,7 +8,7 @@ import { generateOtpCode, hashOtpCode } from "../auth/otp.js";
  * `otp_challenges`/`merchant_user_id`, so only that one is mirrored below
  * against `admin_otp_challenges`/`admin_user_id`.
  */
-export { generateOtpCode, hashOtpCode, verifyOtpCode } from "../auth/otp.js";
+export { generateOtpCode, hashOtpCode, matchesOtpOverride, verifyOtpCode } from "../auth/otp.js";
 
 /** @property code Generated with crypto.randomInt; never stored, only its salted hash. */
 export interface IssuedAdminOtpChallenge {

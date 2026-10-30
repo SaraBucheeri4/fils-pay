@@ -9,6 +9,9 @@ import { createFetchTransport } from "./webhooks/transport.js";
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
   console.log(`[index] booting, date=${formatIsoDate(new Date())}`);
+  if (config.otpOverrideCode || config.adminOtpOverrideCode) {
+    console.warn("[index] WARNING: an OTP override code is set. Testing only; anyone holding it skips the emailed OTP.");
+  }
   const pool = createPool(config);
   // One transport per process: the dispatcher's background pass and the
   // merchant-facing "send test event" route both run on this same instance.

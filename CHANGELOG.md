@@ -11,6 +11,8 @@ it. Format loosely follows Keep a Changelog.
   in step with the registered routes.
 - Postman collection at `docs/api/filspay.postman_collection.json`, generated
   from that spec, with scripts that carry OTPs, keys and ids between requests.
+- `OTP_OVERRIDE_CODE` and `ADMIN_OTP_OVERRIDE_CODE`: optional fixed OTP codes for
+  testing. Unset by default; the API refuses to boot with them in production.
 - Rate limiting backed by Postgres (migration 0097). Over budget returns `429`
   `rate_limited` with `Retry-After`. Stricter budgets on login, OTP, signup,
   hosted checkout, CSV export and webhook test sends.

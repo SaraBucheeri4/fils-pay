@@ -27,6 +27,11 @@ export interface Config {
   otpEmailFrom?: string;
   /** Temporary demo routing, explicitly configured; unset to deliver to each user. */
   otpEmailToOverride?: string;
+  /** Testing only: a fixed code accepted at merchant OTP verify as well as the
+   *  emailed one. The password step and every limit still apply. Separate from
+   *  the admin code so the money-moving plane is opted into on its own. */
+  otpOverrideCode?: string;
+  adminOtpOverrideCode?: string;
   /** Release gate; merchant opt-in is independently required (ADR-0009). */
   refundsReleaseEnabled: boolean;
 
@@ -173,6 +178,19 @@ function parseBoolEnv(value: string | undefined, fallback: boolean): boolean {
   return value === "true" || value === "1";
 }
 
+/** Fails boot rather than ignoring the value, so production can't quietly carry
+ *  a login bypass, or an operator believe a too-short code is in effect. */
+function parseOtpOverride(name: string, value: string | undefined, nodeEnv: Config["nodeEnv"]): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (nodeEnv === "production") {
+    throw new Error(`loadConfig: ${name} must not be set when NODE_ENV=production`);
+  }
+  if (value.length < 6) {
+    throw new Error(`loadConfig: ${name} must be at least 6 characters`);
+  }
+  return value;
+}
+
 function parseTrustProxy(value: string | undefined): string | boolean {
   if (value === undefined || value === "") return "loopback,linklocal,uniquelocal";
   if (value === "false" || value === "0") return false;
@@ -248,6 +266,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     resendApiKey: env.RESEND_API_KEY,
     otpEmailFrom: env.OTP_EMAIL_FROM ?? "FilsPay <onboarding@resend.dev>",
     otpEmailToOverride: env.OTP_EMAIL_TO_OVERRIDE,
+    otpOverrideCode: parseOtpOverride("OTP_OVERRIDE_CODE", env.OTP_OVERRIDE_CODE, nodeEnv),
+    adminOtpOverrideCode: parseOtpOverride("ADMIN_OTP_OVERRIDE_CODE", env.ADMIN_OTP_OVERRIDE_CODE, nodeEnv),
     refundsReleaseEnabled: parseBoolEnv(env.FEATURE_REFUNDS, false),
 
     argon2MemoryKib: parseIntEnv(env.ARGON2_MEMORY_KIB, 19_456),

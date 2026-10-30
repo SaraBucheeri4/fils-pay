@@ -102,6 +102,10 @@ services:
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       # Adds admin routes to the /v1/docs page. Off so it isn't a public map.
       API_DOCS_INCLUDE_INTERNAL: ${API_DOCS_INCLUDE_INTERNAL:-false}
+      # Testing only; see ops/otp-email.md. The api won't boot with these set
+      # under NODE_ENV=production.
+      OTP_OVERRIDE_CODE: ${OTP_OVERRIDE_CODE:-}
+      ADMIN_OTP_OVERRIDE_CODE: ${ADMIN_OTP_OVERRIDE_CODE:-}
     volumes:
       - filspay_kyc:/app/data/kyc
     # Wait for the schema, and for the seed when the seed profile is on.
