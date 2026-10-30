@@ -169,24 +169,6 @@ Dependencies below include both strict prerequisites and changes that must be co
 
 The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a governance question recorded under "Repository integrity concerns", not a defect in this fix.
 
-- [ ] **B03 — Migration 0055 uses nonexistent account columns**
-
-**Category:** Account-classification sign-off; original startup mismatch repaired.
-
-**Summary and business impact:** The original insert used nonexistent columns. Current0055 uses id/name/kind and no longer blocks startup for that reason. Finance approval of unused account kinds is outstanding, not an unfixed column bug.
-
-**Code references:** [db/migrations/0055_chart_of_accounts_suspense.sql](db/migrations/0055_chart_of_accounts_suspense.sql), [db/migrations/0007_ledger_double_entry.sql](db/migrations/0007_ledger_double_entry.sql), [db/migrate.ts](db/migrate.ts).
-
-**Suggested fixes:** Align the insert with actual columns and permitted account kinds. Confirm the intended accounting classification and migration history before repairing the upgrade path.
-
-**Why this approach:** Fixes the schema mismatch without inventing incompatible accounts or bypassing migration tracking.
-
-**Dependencies / verification:** B02. Validate fresh installation and upgrades; do not silently modify migrations already applied elsewhere.
-
-**Status (2026-10-29): fixed, awaiting finance sign-off.** [0055](db/migrations/0055_chart_of_accounts_suspense.sql) now inserts `(id, name, kind)` with kind `asset`, matching 0007's existing suspense account. Editing it was safe: as written it could not apply on any database with this schema. Fresh install verified (9 accounts present). Outstanding: finance must confirm the kind for `chargeback_suspense` before first use.
-
-**Tested (2026-10-29):** fresh install and both upgrade paths apply 0055 cleanly. Accounts present: `fx_rounding_difference(asset)` and `chargeback_suspense(asset)`, alongside the 7 existing ones. No longer a startup blocker. **Blocked only on finance sign-off of the account kinds**, which is why this stays unchecked. Neither account is used by code yet. Note that [db/migrate.ts](db/migrate.ts) stores only filenames (no checksum, contrary to the inline comment), so a database that somehow applied a different 0055 would not be detected (see B57).
-
 - [x] **B04 — Development encryption-key fallback has the wrong length**
 
 **Category:** Startup blocker.
@@ -457,7 +439,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B08 and B22. Review existing duplicates and verify concurrent daemon/CLI passes create one logical payout.
 
-- [ ] **B25 — Child payouts do not sum to the parent payout**
+- [x] **B25 — Child payouts do not sum to the parent payout**
 
 **Category:** Money allocation.
 
@@ -647,7 +629,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B36. Test more than one page of rows sharing a timestamp before wiring this helper into the live route.
 
-- [ ] **B39 — Settlement summary overcounts partial captures and is slow**
+- [x] **B39 — Settlement summary overcounts partial captures and is slow**
 
 **Category:** Reporting correctness / performance.
 
@@ -763,7 +745,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B16.
 
-- [ ] **B46 — Platform volume counter overflows int32**
+- [x] **B46 — Platform volume counter overflows int32**
 
 **Category:** Money correctness.
 
@@ -777,7 +759,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** Check the production value before migrating.
 
-- [ ] **B47 — Promotional discount parser uses floats and cents**
+- [x] **B47 — Promotional discount parser uses floats and cents**
 
 **Category:** Money correctness (latent; not called anywhere today).
 
@@ -791,7 +773,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None.
 
-- [ ] **B48 — Refund settlement notification divides the amount by 10**
+- [x] **B48 — Refund settlement notification divides the amount by 10**
 
 **Category:** Money correctness (latent; not called anywhere today).
 
@@ -805,7 +787,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B16.
 
-- [ ] **B49 — Settlement report fee estimate uses floating-point rates**
+- [x] **B49 — Settlement report fee estimate uses floating-point rates**
 
 **Category:** Money correctness.
 
@@ -875,7 +857,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B23. Confirm with the acquirer whether this is the sandbox or a live secret.
 
-- [ ] **B55 — Documented nightly balance refresh does not exist**
+- [x] **B55 — Documented nightly balance refresh does not exist**
 
 **Category:** Documentation / operations.
 
@@ -920,36 +902,6 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 **Current fork behavior: a reason is optional.** [processRefund.ts](apps/api/src/payments/processRefund.ts) stores a missing, empty or whitespace-only reason as `'unspecified'` (`UNSPECIFIED_REFUND_REASON`, matching 0070's column default) instead of sending NULL; a given reason is trimmed before it is hashed and stored. Verified by new [refundReason.new.test.ts](apps/api/src/payments/refundReason.new.test.ts) (5/5). All 15 locked refund tests in `processRefund.test.ts` and `initiateMerchantRefund.test.ts` now pass **unmodified**; full api suite 391/392.
 
 **Evidence limits:** Original optional types/tests and nullable reason support optional input; the current fork writes unspecified, satisfying0070. Editable author names and release dates do not prove who wrote0070 or when. Claims that its actual author maliciously broke a finished feature have been removed. Runtime validation of non-string reasons is not established by this resolution.
-
-- [ ] **B59 — Webhook backoff test asserts an exact delay the code randomises**
-
-**Category:** Invalid test.
-
-**Summary and business impact:** `dispatcher.test.ts` asserts `backoffDelayMs(1, config) === 1000`, but `backoffDelayMs` deliberately applies ±10% random jitter by default (documented in its JSDoc). The test fails on almost every run (observed 924, 979, 1063 and 1093). The code is correct; the test is wrong, so the suite can never pass reliably.
-
-**Code references:** [apps/api/src/webhooks/dispatcher.test.ts](apps/api/src/webhooks/dispatcher.test.ts) (line 196), [apps/api/src/webhooks/dispatcher.ts](apps/api/src/webhooks/dispatcher.ts).
-
-**Suggested fixes:** Pass a fixed jitter (`() => 0.5`) or assert the 900–1100 ms range. Because existing test files are locked, this needs an explicit exception to change it, or a corrected replacement test in a new file with the old assertion retired.
-
-**Why this approach:** A test should pin intended behaviour, not a coincidence of random input.
-
-**Dependencies / verification:** None. Not caused by any 2026-10-29 change; this is the only non-refund api failure.
-
-**Partial remediation: replacement coverage exists, but the original failing assertion remains active.** The jitter and the exact-delay assertion were added in the same commit (`c2f3627`), so the test was wrong from the start. New [dispatcher.backoff.new.test.ts](apps/api/src/webhooks/dispatcher.backoff.new.test.ts) repeats the backoff/exhaustion sequence, checks the delay actually applied to each row (`next_attempt_at − last_attempted_at`, both set from one database `now()`) against the ±10 % jitter range, and checks exact values (900/1000/1100 ms, doubling, the 60 s cap) with a fixed jitter source. 3/3 passing, stable across repeated runs. The original locked test is unchanged and still fails; treat that failure as known and superseded.
-
-- [ ] **B60 — Test suites contaminate each other on a shared database**
-
-**Category:** Test reliability.
-
-**Summary and business impact:** Historical records report API fixtures with empty outbox payloads contaminating reporting tests on a shared database. Current CLAUDE.md does not require that setup. This is a test-isolation concern under that setup, not proof the full suite can never pass locally. It was not rerun against a disposable database in this audit.
-
-**Code references:** [apps/reporting/src/consumer/runConsumerPass.test.ts](apps/reporting/src/consumer/runConsumerPass.test.ts), [apps/reporting/src/cli/rebuild.test.ts](apps/reporting/src/cli/rebuild.test.ts), [apps/api/src/webhooks/dispatcher.test.ts](apps/api/src/webhooks/dispatcher.test.ts), [CLAUDE.md](CLAUDE.md).
-
-**Suggested fixes:** Give each workspace its own database (or schema) in the test runner, or have tests clean up the outbox rows they create.
-
-**Why this approach:** Isolation makes failures mean something.
-
-**Dependencies / verification:** B59.
 
 - [x] **B61 — Hold expiry deletes every hold on a night with nothing expired**
 
@@ -1100,34 +1052,6 @@ For escalation; recorded so they are not lost.
 
 Removed from active confirmed-bug remediation; IDs retained to preserve references. No fix is implied by reclassification.
 
-- [ ] **B07 — Card processing uses only a simulator**
-
-**Category:** Integration decision.
-
-**Summary and business impact:** The API always constructs a simulator; approvals do not represent real card processing. This is a live-launch gap, not necessarily a defect for a demo.
-
-**Code references:** [apps/api/src/app.ts](apps/api/src/app.ts), [apps/api/src/acquirer/simulator.ts](apps/api/src/acquirer/simulator.ts), [apps/api/src/acquirer/types.ts](apps/api/src/acquirer/types.ts).
-
-**Suggested fixes:** Decide whether the target is a demo or live payments. For live use, add a provider adapter with stable idempotency, timeout recovery and callback verification; retain an explicit simulator mode.
-
-**Why this approach:** Keeps demonstrations deterministic and prevents simulated approvals being mistaken for live payments.
-
-**Dependencies / verification:** B17–B23. Requires a provider contract; do not mark live-ready from simulator tests.
-
-- [ ] **B08 — Paid batch status does not represent a confirmed bank transfer**
-
-**Category:** Integration decision.
-
-**Summary and business impact:** Payout code posts ledger entries and marks batches paid without initiating or confirming a bank transfer. The business cannot treat that status as evidence of disbursement.
-
-**Code references:** [apps/settlement/internal/settlement/batch.go](apps/settlement/internal/settlement/batch.go), [apps/settlement/internal/splits/allocate.go](apps/settlement/internal/splits/allocate.go), [apps/settlement/internal/settlement/payout_notify.go](apps/settlement/internal/settlement/payout_notify.go), [apps/api/src/webhooks/payoutDisbursement.ts](apps/api/src/webhooks/payoutDisbursement.ts).
-
-**Suggested fixes:** For live payouts, add a durable payout instruction and provider/manual-confirmation workflow. Mark paid only on authoritative confirmation; make retries and ledger posting idempotent.
-
-**Why this approach:** Separates money owed, transfer requested and transfer completed, preventing false payout confirmations.
-
-**Dependencies / verification:** B11, B24, B25 and B28. Coordinate ledger, status, reports and notifications; demo-only scope must be explicit.
-
 - [ ] **B09 — OTP delivery is a logging stub**
 
 **Category:** Integration gap.
@@ -1142,35 +1066,7 @@ Removed from active confirmed-bug remediation; IDs retained to preserve referenc
 
 **Dependencies / verification:** B32 and B33. Test delivery failure, expiry and resend for merchant and admin accounts.
 
-- [ ] **B13 — Balance adjustments affect only the cache despite journaled documentation**
-
-**Category:** Accounting policy conflict.
-
-**Summary and business impact:** The active adjustment route updates the cached balance and audit log but not the ledger. Corrections disappear on rebuild and disagree with ADMIN.md; ADR 0006 prescribes cache-only behavior.
-
-**Code references:** [apps/api/src/routes/adminBalanceAdjustments.ts](apps/api/src/routes/adminBalanceAdjustments.ts), [apps/api/src/admin/balanceAdjustments.ts](apps/api/src/admin/balanceAdjustments.ts), [apps/api/src/admin/ledgerAdjustments.ts](apps/api/src/admin/ledgerAdjustments.ts), [docs/ADMIN.md](docs/ADMIN.md), [docs/adr/0006-display-adjustments.md](docs/adr/0006-display-adjustments.md).
-
-**Suggested fixes:** Resolve the documented policy conflict. For actual financial corrections, use balanced journal entries with reasons and effective dates, and update the cache consistently. Label any retained display-only corrections explicitly.
-
-**Why this approach:** Distinguishes a financial correction from a visual override and prevents a rebuild from silently undoing real corrections.
-
-**Dependencies / verification:** B14 and B28. Review existing cache adjustments before migration; do not automatically journal all historical display changes.
-
-- [ ] **B17 — Client timestamps can bypass payment-link expiry**
-
-**Category:** Documented client-clock security-policy decision.
-
-**Summary and business impact:** Expiry checking trusts submittedAt from the payer, allowing a backdated request to make an expired link payable.
-
-**Code references:** [apps/api/src/paymentLinks/pay.ts](apps/api/src/paymentLinks/pay.ts), [apps/api/src/routes/paymentLinks.ts](apps/api/src/routes/paymentLinks.ts), [apps/web/src/pages/checkout/CheckoutPage.tsx](apps/web/src/pages/checkout/CheckoutPage.tsx).
-
-**Decision needed:** Architecture expressly permits offline-terminal submittedAt. Backdating is possible by design; changing to server-clock expiry requires an explicit approved policy change.
-
-**Why this approach:** This is an explicit client-clock policy with security implications, not an accidental implementation divergence.
-
-**Dependencies / verification:** B18. ARCHITECTURE.md currently describes client-time expiry; explicitly supersede that policy when implementing this reported defect.
-
-- [ ] **B30 — Lifetime payout totals lose whole-fils precision**
+- [x] **B30 — Lifetime payout totals lose whole-fils precision**
 
 **Category:** Approximate monitoring limitation; not actual payout arithmetic.
 
@@ -1183,20 +1079,6 @@ Removed from active confirmed-bug remediation; IDs retained to preserve referenc
 **Why this approach:** Reconstructing from exact source records recovers information that casting an already-rounded float cannot restore.
 
 **Dependencies / verification:** B11, B08 and B28. Treat schema changes as explicit migrations and reconcile before/after totals.
-
-- [ ] **B54 — Orphaned "production-equivalent" seed file**
-
-**Category:** Unused fixture integrity/hygiene; no established personal-data exposure.
-
-**Summary and business impact:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql) (50,338 lines, labelled "production-equivalent", from a "prod-mirror" environment) is referenced by no code, config or doc. It posts to four ledger accounts that do not exist (`merchant_receivable`, `platform_fee`, `refund_payable`, `settlement_holding`), so it could not load.
-
-**Code references:** [db/seed/fixtures/production_seed.sql](db/seed/fixtures/production_seed.sql).
-
-**Decision needed:** Production/prod-mirror labels are unverified. Inspected merchants match fictional fixtures. Invalid account IDs are an artifact-validity issue, not proof of leaked customer data. Escalate exposure only with independent real-data evidence.
-
-**Why this approach:** The artifact has incompatible fixture entries; claimed production provenance alone does not establish confidentiality exposure.
-
-**Dependencies / verification:** None.
 
 - [x] **B65 — A fully refunded partial capture becomes refundable again**
 
@@ -1231,7 +1113,7 @@ Removed from active confirmed-bug remediation; IDs retained to preserve referenc
 
 No production or disposable-database integration reproduction is claimed for these findings.
 
-- [ ] **B69 - Capture idempotency omits transaction identity**
+- [x] **B69 - Capture idempotency omits transaction identity**
 
 **Evidence and impact:** Capture hashes amount only while key scope is merchant+endpoint+key. Reusing the key/amount for another transaction can replay the first result.
 
@@ -1401,7 +1283,7 @@ Review of a1e19d7 and the proposed follow-up. These entries distinguish confirme
 
 **Dependencies / verification:** B16, B20, B21, B44, B83. Source-reviewed; no database reproduction in this pass.
 
-- [ ] **B89 - Reconciliation pending ignores effective fee schedules and platform tier**
+- [x] **B89 - Reconciliation pending ignores effective fee schedules and platform tier**
 
 **Category:** Confirmed pricing-input mismatch, separate from B49/B66 rounding/formula disputes.
 
@@ -1541,3 +1423,107 @@ across 2600 rows sharing one timestamp.
 false by default, so a deployment needs it set and at least one merchant enabled
 before a refund can run there. The drawer has typecheck, build and helper-test
 evidence, but has not been clicked through in a browser.
+
+
+## Checklist review (2026-10-30)
+
+Each open item was re-checked against the code and designated sources. Tests ran
+on disposable Postgres; nothing was run against the hosted server.
+
+**Ticked, already fixed:**
+
+| Item | Evidence |
+|---|---|
+| B25 | 3 child shares of a 9751 net payout sum to exactly 9751 |
+| B30 | Column is bigint, written in whole fils |
+| B39 | Captures of 400 and 600 report 1000 and one transaction. Its "slow" claim was never measured |
+| B46 | Column is bigint; the counter passed the int32 limit to 3000001000 |
+| B47 | "1.500" parses to 1500 |
+| B48 | Code read: amounts are sent unchanged. The helper has no caller |
+| B49 | 602 fils at 275 bps with a 12.5% discount gives 14, in integer arithmetic |
+| B55 | Daemon refreshes at 02:00 Bahrain. Unit test only; no live 02:00 run observed |
+| B69 | Reusing a capture key on another transaction returns 422 |
+| B89 | With a 100 bps schedule, fee 100, pending 9900, gap 0 |
+
+**Removed at the owner's direction.** These are not product defects or are test
+problems, so their entries are gone. Older sections may still mention the IDs.
+
+| Item | Why removed |
+|---|---|
+| B03 | Migration works and the accounts are unused; only a finance sign-off on their kind remains |
+| B07 | Simulator is a scope decision for this demo; real card processing would need a provider |
+| B08 | "Paid" meaning no confirmed bank transfer is a scope decision; live money would need one |
+| B13 | ADR-0006 prescribes cache-only adjustments |
+| B17 | ARCHITECTURE permits client-clock expiry. The behaviour remains: a link expired 30 days returned 410 normally and 200 with a backdated submittedAt. Changing it needs an owner decision |
+| B54 | Unreferenced fixture file |
+| B59 | Test problem, see original_history.md section 9 |
+| B60 | Test isolation only; separate databases avoid it |
+
+**Still open from earlier:** B09, B16 (awaits the live refund test), B23 (raw-bytes
+question awaits the acquirer) and B53 (external rotation and git history).
+
+## Bugs added in the 2026-10-30 review
+
+- [ ] **B92 - KYC files are lost when the API container is recreated**
+
+**Evidence and impact:** Uploads are written to `/app/data/kyc` inside the container. Compose mounts no volume there, and the files are not in the database backup. Rows in kyc_documents survive and their files do not. Read from the code and compose file; not reproduced by losing a file. Redeploys on 2026-10-30 recreated the hosted API container, so earlier uploads there may be gone.
+
+**Code references:** [kyc.ts](apps/api/src/onboarding/kyc.ts), [config.ts](apps/api/src/config.ts), [docker-compose.yml](ops/docker-compose.yml), [Dockerfile.node](ops/Dockerfile.node).
+
+**Suggested fixes:** Mount a named volume at the upload directory and include it in backups. Compare kyc_documents with the files on disk to find what is missing.
+
+- [ ] **B93 - Volume tier is live without written finance sign-off**
+
+**Evidence and impact:** HANDOVER requires written sign-off and ARCHITECTURE lists no tier as a rate source. Capture still applies it: a 10000-fils capture charges 235 instead of 250 once the counter reaches 2,000,000 BD. Recalculation no longer applies it (ADR-0014). Fixing B46 also means the discount no longer disappears on overflow.
+
+**Code references:** [platformVolumeTier.ts](apps/api/src/fees/platformVolumeTier.ts), [capture.ts](apps/api/src/payments/capture.ts), [platform_volume.go](apps/settlement/internal/settlement/platform_volume.go), [ADR-0014](docs/adr/0014-volume-tier-excluded-from-recalculation.md).
+
+**Suggested fixes:** Obtain finance's written decision, record it in an ADR, then remove the tier or keep it. Removing it changes live pricing.
+
+- [ ] **B94 - Blocked payment links have no console screen**
+
+**Evidence and impact:** After an unknown capture outcome the link stays blocked (ADR-0013). Finance can list and resolve these only through the API, and the merchant cannot cancel the link.
+
+**Code references:** [captureReview.ts](apps/api/src/paymentLinks/captureReview.ts), [adminMerchants.ts](apps/api/src/routes/adminMerchants.ts), [docs/ADMIN.md](docs/ADMIN.md).
+
+**Suggested fixes:** Add a finance and super admin console view for the existing list and resolve routes.
+
+- [ ] **B95 - CSV export can carry spreadsheet formulas**
+
+**Evidence and impact:** Reproduced: a reference of `=HYPERLINK("http://evil")` is exported as a quoted cell that begins with `=`, which a spreadsheet can still run.
+
+**Code references:** [exportCsv.ts](apps/api/src/transactions/exportCsv.ts).
+
+**Suggested fixes:** Neutralize cells beginning with `=`, `+`, `-` or `@`. Keep amounts unaffected, because negative amounts are legitimate.
+
+- [ ] **B96 - A malformed transaction id returns 500**
+
+**Evidence and impact:** Reproduced: `GET /v1/transactions/not-a-uuid` returns 500 instead of 400 or 404. No data is exposed; it adds noise to error logs.
+
+**Code references:** [transactions.ts](apps/api/src/routes/transactions.ts).
+
+**Suggested fixes:** Validate the id before querying, as the admin routes do with assertUuidParam.
+
+- [ ] **B97 - Signature check accepts junk appended to a valid signature**
+
+**Evidence and impact:** Reproduced: a valid inbound signature followed by `zzzz` verifies, because hex decoding stops at the first invalid character. A signature still cannot be forged; the check is just looser than it looks.
+
+**Code references:** [crypto.ts](apps/api/src/lib/crypto.ts), [inboundVerify.ts](apps/api/src/webhooks/inboundVerify.ts).
+
+**Suggested fixes:** Require exactly 64 hex characters before decoding. The helper is shared, so check its other callers.
+
+- [ ] **B98 - Batch page progress bar uses float arithmetic on money**
+
+**Evidence and impact:** `parseFloat((batch.grossFils / 10000).toFixed(2))` sets a bar width, and ADR-0001 makes float arithmetic on money a review blocker. Display only; no ledger or payout effect. The resulting number has no clear meaning.
+
+**Code references:** [SettlementBatchDetailPage.tsx](apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx).
+
+**Suggested fixes:** Remove the bar, or base it on a defined integer ratio.
+
+- [ ] **B99 - Compose publishes development settings when used for hosting**
+
+**Evidence and impact:** The file says the hosted demo box runs it. It publishes Postgres on all interfaces with a password in the repo, runs `NODE_ENV: development` (OTP codes returned in login responses, public webhook key), uses `dev-token`, and serves dev servers publicly over plain HTTP. The hosted server's own copy binds Postgres to 127.0.0.1; the repository file does not. Depends on B09: production mode cannot log anyone in until OTP delivery exists.
+
+**Code references:** [docker-compose.yml](ops/docker-compose.yml), [config.ts](apps/api/src/config.ts).
+
+**Suggested fixes:** Add a hosting override with a localhost database port, real secrets, production mode and HTTPS. Do not switch to production before B09.
