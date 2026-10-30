@@ -179,6 +179,22 @@ textarea:focus-visible {
   box-shadow: var(--admin-shadow-sm);
 }
 
+/* Credits reuses admin-nav for its status tabs; the active tab is disabled. */
+.admin-main .admin-nav {
+  flex-flow: row wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.admin-main .admin-nav button + button {
+  margin-left: 0;
+}
+
+.admin-main .admin-nav button:disabled {
+  background: var(--admin-custard);
+  opacity: 1;
+}
+
 .admin-content {
   display: flex;
   flex-direction: column;
@@ -302,7 +318,13 @@ textarea {
 }
 
 input[type="search"] {
-  width: min(24rem, 100%);
+  width: min(24rem, calc(100vw - 9rem));
+}
+
+.admin-form label:has(> input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 input[type="checkbox"],
@@ -328,6 +350,14 @@ button {
   border-radius: 0.75rem;
   box-shadow: var(--admin-shadow-sm);
   transition: transform 80ms ease, box-shadow 80ms ease, background-color 80ms ease;
+}
+
+button + button {
+  margin-left: 0.5rem;
+}
+
+.admin-form > button + button {
+  margin-left: 0;
 }
 
 button:hover:not(:disabled) {
@@ -356,7 +386,7 @@ button[type="submit"]:hover:not(:disabled) {
 .admin-filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.75rem;
   margin: 1rem 0;
   padding: 0.75rem 1rem 1rem;

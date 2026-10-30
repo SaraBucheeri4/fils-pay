@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_dashboard" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Rubik:wght@600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overscroll-behavior: none;
+        background-color: #faf8f2;
+      }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+
+    /* 2D Cartoon Neobrutalist Hard Shadow Utilities */
+    .cartoon-border {
+      border: 2.5px solid #401f3e;
+    }
+    .cartoon-border-3 {
+      border: 3px solid #401f3e;
+    }
+    .cartoon-shadow-sm {
+      box-shadow: 2.5px 2.5px 0px #401f3e;
+    }
+    .cartoon-shadow {
+      box-shadow: 4px 4px 0px #401f3e;
+    }
+    .cartoon-shadow-lg {
+      box-shadow: 6px 6px 0px #401f3e;
+    }
+    .cartoon-shadow-active:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #401f3e;
+    }
+    .comic-badge {
+      border: 2px solid #401f3e;
+      box-shadow: 2px 2px 0px #401f3e;
+    }
+  </style>
+</head>
+<body class="bg-[#faf8f2] text-[#401f3e] font-['Plus_Jakarta_Sans',sans-serif] antialiased selection:bg-[#faf2a1] selection:text-[#401f3e]">
+<!-- 2D Cartoon Sidebar -->
+<aside class="fixed left-0 top-0 h-full w-72 bg-[#ffffff] z-50 flex flex-col justify-between py-4 border-r-[3px] border-[#401f3e]">
+<div class="flex flex-col gap-4">
+<!-- App Brand Logo -->
+<div class="px-5 flex items-center gap-3">
+<div class="w-11 h-11 rounded-2xl bg-[#faf2a1] cartoon-border cartoon-shadow-sm flex items-center justify-center -rotate-3 hover:rotate-0 transition-transform">
+<span class="material-symbols-outlined text-[#401f3e] text-[26px]" style="font-variation-settings: 'FILL' 1;">token</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-['Rubik'] font-extrabold text-2xl text-[#401f3e] tracking-tight">FilsPay</span>
+<span class="px-1.5 py-0.5 rounded-md bg-[#faf2a1] text-[#401f3e] text-[10px] font-black cartoon-border">2D</span>
+</div>
+<span class="font-['Rubik'] text-[11px] font-bold text-[#759aab] uppercase tracking-wider">Vault Engine</span>
+</div>
+</div>
+<!-- Merchant Switcher -->
+<div class="mx-4 px-3.5 py-2.5 bg-[#f5f2eb] rounded-2xl cartoon-border cartoon-shadow-sm flex items-center justify-between cursor-pointer hover:bg-[#faf2a1]/60 transition-colors">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-xl bg-[#759aab]/30 cartoon-border flex items-center justify-center">
+<span class="material-symbols-outlined text-[#401f3e] text-[18px]">store</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-[#759aab] uppercase tracking-wider">Active Merchant</span>
+<span class="font-['Rubik'] text-xs font-bold text-[#401f3e] truncate max-w-[120px]">Alpha Retail Co</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-[#401f3e] text-[20px] font-bold">unfold_more</span>
+</div>
+<!-- Nav Menu Items -->
+<nav class="px-4 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3.5 py-2.5 bg-[#faf2a1] text-[#401f3e] font-bold rounded-2xl cartoon-border cartoon-shadow-sm transition-all" data-path="overview-hub" href="#">
+<span class="material-symbols-outlined text-[22px] text-[#401f3e]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-['Rubik'] text-sm font-bold">Overview / Hub</span>
+<span class="ml-auto w-2 h-2 rounded-full bg-[#453f78]"></span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="transactions-ledger-live-feed" href="#">
+<span class="material-symbols-outlined text-[20px]">receipt_long</span>
+<span class="text-sm">Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="merchants-admin-multi-entity" href="#">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+<span class="text-sm">Merchants</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="payment-links" href="#">
+<span class="material-symbols-outlined text-[20px]">link</span>
+<span class="text-sm">Payment Links</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="settlement-vault" href="#">
+<span class="material-symbols-outlined text-[20px]">lock</span>
+<span class="text-sm">Settlement &amp; Vault</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="analytics-quests" href="#">
+<span class="material-symbols-outlined text-[20px]">military_tech</span>
+<span class="text-sm">Analytics &amp; Quests</span>
+<span class="ml-auto bg-[#faf2a1] text-[#401f3e] comic-badge text-[10px] font-black px-1.5 rounded-full">+2</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-[#3f2e56] hover:bg-[#f0edf9] hover:text-[#401f3e] rounded-2xl border-2 border-transparent hover:border-[#401f3e] transition-all font-semibold" data-path="settings" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="text-sm">Settings</span>
+</a>
+</nav>
+</div>
+<!-- Cartoon Bottom Gamified Meter -->
+<div class="px-4 flex flex-col gap-3">
+<div class="p-3.5 bg-[#f5f2eb] rounded-2xl cartoon-border cartoon-shadow-sm flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-['Rubik'] text-[11px] font-extrabold text-[#453f78]">QUEST EXP 2,450 XP</span>
+<span class="px-2 py-0.5 rounded-full bg-[#faf2a1] cartoon-border font-['Rubik'] text-[10px] font-black text-[#401f3e]">Lvl 8</span>
+</div>
+<div class="w-full h-3 bg-white rounded-full cartoon-border overflow-hidden p-0.5">
+<div class="h-full bg-[#faf2a1] rounded-full cartoon-border-3 border-transparent" style="width: 75%; background-color: #faf2a1; background-image: repeating-linear-gradient(45deg, #faf2a1, #faf2a1 6px, #ffd966 6px, #ffd966 12px);"></div>
+</div>
+<span class="text-[11px] font-bold text-[#3f2e56] flex items-center gap-1">
+<span class="text-amber-500 font-black">★</span> 550 XP to Diamond Tier II
+        </span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1">
+<span class="material-symbols-outlined text-[#759aab] text-[18px]">verified_user</span>
+<span class="text-[11px] font-bold text-[#759aab]">BHD Vault Custody v4.2</span>
+</div>
+</div>
+</aside>
+<!-- Top Navbar Header (2D Cartoon Light Theme) -->
+<div class="pl-72">
+<header class="fixed top-0 left-72 right-0 h-18 bg-[#ffffff]/95 backdrop-blur-md border-b-[3px] border-[#401f3e] z-40 flex items-center justify-between px-7 py-3">
+<!-- Search Input -->
+<div class="flex items-center gap-4 flex-1 max-w-md">
+<div class="flex items-center gap-2 w-full px-3.5 py-2 bg-[#f5f2eb] rounded-2xl cartoon-border cartoon-shadow-sm focus-within:bg-white focus-within:ring-2 ring-[#453f78] transition-all">
+<span class="material-symbols-outlined text-[#401f3e] text-[20px] font-bold">search</span>
+<input class="bg-transparent w-full text-[#401f3e] font-semibold placeholder:text-[#759aab] focus:outline-none text-xs" placeholder="Search transactions, invoices, hash..." type="text"/>
+</div>
+</div>
+<!-- Header Gamified Highlights & Profile -->
+<div class="flex items-center gap-3">
+<!-- 24h Streak Pill -->
+<div class="hidden xl:flex items-center gap-2 px-3.5 py-1.5 bg-[#faf2a1] rounded-full cartoon-border cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[#401f3e] text-[18px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-['Rubik'] text-[11px] font-black text-[#401f3e] uppercase tracking-wider">24H STREAK</span>
+<span class="font-['Rubik'] text-xs font-black text-[#453f78] ml-1">14,820.500 BHD</span>
+</div>
+<!-- Diamond Merchant Badge -->
+<div class="flex items-center gap-2 px-3.5 py-1.5 bg-[#f0edf9] rounded-full cartoon-border cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[#453f78] text-[18px]" style="font-variation-settings: 'FILL' 1;">diamond</span>
+<span class="font-['Rubik'] text-xs font-black text-[#453f78]">Lvl 8 Diamond Merchant</span>
+</div>
+<!-- Quest counter badge -->
+<div class="flex items-center gap-1.5 px-3 py-1.5 bg-[#dbe8ee] rounded-xl cartoon-border cartoon-shadow-sm cursor-pointer hover:bg-[#faf2a1] transition-colors">
+<span class="material-symbols-outlined text-[#401f3e] text-[18px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">3/4 Quests</span>
+</div>
+<!-- Notification Bell -->
+<button class="w-10 h-10 rounded-2xl bg-[#ffffff] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e] hover:bg-[#faf2a1] cartoon-shadow-active transition-all relative">
+<span class="material-symbols-outlined text-[20px] font-bold">notifications</span>
+<span class="w-3 h-3 rounded-full bg-[#faf2a1] cartoon-border absolute -top-1 -right-1"></span>
+</button>
+<!-- User Profile -->
+<div class="flex items-center gap-2.5 pl-2">
+<div class="hidden md:flex flex-col text-right">
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Alpha Owner</span>
+<span class="text-[11px] font-semibold text-[#759aab] truncate max-w-[140px]">owner@alpharetail.example</span>
+</div>
+<div class="w-10 h-10 rounded-2xl bg-[#453f78] cartoon-border cartoon-shadow-sm flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[22px]">person</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Cartoon Canvas Body -->
+<main class="relative pt-24 w-full px-8 bg-[#faf8f2] min-h-screen">
+<div class="flex flex-col w-full pb-14">
+<!-- Top Announcement Bar & Streak Booster -->
+<div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 py-2 mb-6">
+<div class="flex flex-col">
+<div class="flex items-center gap-2 mb-1">
+<span class="px-2 py-0.5 rounded-lg bg-[#453f78] text-white text-[10px] font-black uppercase tracking-wider cartoon-border cartoon-shadow-sm">Autonomous Protocol</span>
+<span class="w-2.5 h-2.5 rounded-full bg-[#faf2a1] cartoon-border animate-bounce"></span>
+<span class="font-['Rubik'] text-xs font-bold text-[#759aab]">NODE_BH_01 ACTIVE</span>
+</div>
+<div class="flex items-center gap-3 flex-wrap">
+<h1 class="font-['Rubik'] text-3xl md:text-4xl font-black text-[#401f3e] tracking-tight">
+                Good evening, <span class="text-[#453f78] underline decoration-[#faf2a1] decoration-wavy decoration-4">Alpha Retail Co</span>
+</h1>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#faf2a1] text-[#401f3e] font-['Rubik'] text-xs font-black cartoon-border cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">military_tech</span>
+                Lvl 8 Master Merchant
+              </span>
+</div>
+</div>
+<!-- Quick Dynamic Controls / Streak Booster Widget -->
+<div class="flex items-center gap-3 self-stretch md:self-auto flex-wrap">
+<div class="flex items-center gap-3 px-4 py-2.5 bg-white rounded-2xl cartoon-border cartoon-shadow">
+<div class="w-9 h-9 rounded-xl bg-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] font-extrabold text-[#759aab] uppercase tracking-wider">7-DAY STREAK</span>
+<span class="font-['Rubik'] text-xs font-black text-[#453f78]">+15% Fee Rebate Active! 🎉</span>
+</div>
+</div>
+<button class="px-4 py-2.5 bg-[#453f78] hover:bg-[#3f2e56] text-white font-['Rubik'] font-bold text-xs rounded-2xl cartoon-border cartoon-shadow cartoon-shadow-active flex items-center gap-1.5 transition-all">
+<span class="material-symbols-outlined text-[18px] text-[#faf2a1]">bolt</span>
+<span>Quick Terminal</span>
+</button>
+</div>
+</div>
+<!-- Gamified Hero Level Progress Banner (Vanilla Custard 2D Box) -->
+<div class="relative overflow-hidden bg-[#faf2a1] cartoon-border-3 cartoon-shadow-lg rounded-3xl p-6 mb-8">
+<!-- Playful Decorative Dots / Background Pattern -->
+<div class="absolute -right-6 -bottom-6 w-32 h-32 rounded-full border-4 border-[#401f3e]/15 pointer-events-none"></div>
+<div class="absolute right-20 -top-4 w-16 h-16 rounded-full border-4 border-[#401f3e]/15 pointer-events-none"></div>
+<div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+<div class="flex items-center gap-4 max-w-xl">
+<!-- Playful Cartoon Gauge Badge -->
+<div class="relative flex-shrink-0 w-20 h-20 rounded-2xl bg-white cartoon-border-3 cartoon-shadow flex items-center justify-center">
+<svg class="w-16 h-16 transform -rotate-90" viewbox="0 0 48 48">
+<circle cx="24" cy="24" fill="transparent" r="19" stroke="#f0edf9" stroke-width="4"></circle>
+<circle cx="24" cy="24" fill="transparent" r="19" stroke="#453f78" stroke-dasharray="119.3" stroke-dashoffset="18.5" stroke-linecap="round" stroke-width="4.5"></circle>
+</svg>
+<div class="absolute flex flex-col items-center justify-center">
+<span class="font-['Rubik'] text-xl font-black text-[#401f3e]">8</span>
+<span class="text-[8px] font-black text-[#759aab] uppercase -mt-1">LVL</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-['Rubik'] text-base font-black text-[#401f3e]">Diamond Tier Progression</span>
+<span class="px-2 py-0.5 rounded-full bg-[#453f78] text-[#faf2a1] font-['Rubik'] text-xs font-black cartoon-border">84.5%</span>
+</div>
+<p class="text-xs font-bold text-[#3f2e56] leading-relaxed">
+                  Earn <span class="font-black text-[#401f3e] underline">1,550 XP more</span> before month end to unlock <strong>0.95% Flat BHD Interchange</strong> on all GCC Debit Cards!
+                </p>
+</div>
+</div>
+<!-- XP Meter Bar with Comic Style -->
+<div class="flex-1 max-w-md flex flex-col gap-2">
+<div class="flex items-center justify-between text-xs font-black">
+<span class="text-[#401f3e] bg-white px-2 py-0.5 rounded-lg cartoon-border text-[11px]">8,450 XP EARNED</span>
+<span class="text-[#453f78] font-bold text-[11px]">TARGET: 10,000 XP</span>
+</div>
+<!-- Chunky Progress Bar -->
+<div class="h-5 w-full bg-white rounded-full cartoon-border-3 p-0.5 overflow-hidden shadow-inner">
+<div class="h-full bg-[#453f78] rounded-full transition-all flex items-center justify-end pr-2" style="width: 84.5%">
+<span class="w-2 h-2 rounded-full bg-[#faf2a1]"></span>
+</div>
+</div>
+<div class="flex items-center justify-between text-xs font-bold text-[#401f3e]">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-[#453f78]" style="font-variation-settings: 'FILL' 1;">stars</span>
+                  Daily Multiplier: <strong>1.8x Active</strong>
+</span>
+<a class="text-[#453f78] hover:text-[#401f3e] underline font-extrabold" href="#">View Tier Perks →</a>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Grid KPIs (2D Cartoon Cards with Solid Outlines & Hard Shadows) -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+<!-- 1. Today's Captured Volume -->
+<div class="bg-white rounded-3xl p-5 cartoon-border-3 cartoon-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="text-[11px] font-black text-[#759aab] uppercase tracking-wider">Today's Captured</span>
+<div class="flex items-baseline gap-1.5 mt-1">
+<span class="font-['Rubik'] text-2xl font-black text-[#401f3e]">2,489.320</span>
+<span class="px-1.5 py-0.5 rounded-md bg-[#faf2a1] cartoon-border font-['Rubik'] text-[10px] font-black text-[#401f3e]">BHD</span>
+</div>
+</div>
+<div class="w-11 h-11 rounded-2xl bg-[#dbe8ee] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+</div>
+<!-- Cartoon Wavy Sparkline Chart -->
+<div class="my-3 py-1 bg-[#faf8f2] rounded-xl cartoon-border p-2">
+<svg class="w-full h-10 overflow-visible" viewbox="0 0 160 40">
+<path d="M0,32 Q25,35 45,22 T95,18 T130,8 T160,4 L160,40 L0,40 Z" fill="#faf2a1" opacity="0.8"></path>
+<path d="M0,32 Q25,35 45,22 T95,18 T130,8 T160,4" fill="none" stroke="#401f3e" stroke-linecap="round" stroke-width="3"></path>
+<circle cx="160" cy="4" fill="#453f78" r="5" stroke="#401f3e" stroke-width="2.5"></circle>
+</svg>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="inline-flex items-center gap-1 text-[#453f78] text-xs font-black bg-[#f0edf9] px-2 py-0.5 rounded-lg cartoon-border">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +18.4%
+              </span>
+<span class="text-xs font-bold text-[#759aab]">42 Settled</span>
+</div>
+</div>
+<!-- 2. Pending & Authorized -->
+<div class="bg-white rounded-3xl p-5 cartoon-border-3 cartoon-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="text-[11px] font-black text-[#759aab] uppercase tracking-wider">Authorized Uncaptured</span>
+<div class="flex items-baseline gap-1.5 mt-1">
+<span class="font-['Rubik'] text-2xl font-black text-[#453f78]">426.987</span>
+<span class="px-1.5 py-0.5 rounded-md bg-[#f0edf9] cartoon-border font-['Rubik'] text-[10px] font-black text-[#453f78]">BHD</span>
+</div>
+</div>
+<div class="w-11 h-11 rounded-2xl bg-[#faf2a1] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[24px]">hourglass_top</span>
+</div>
+</div>
+<div class="my-3 flex flex-col gap-1.5 bg-[#faf8f2] p-2.5 rounded-xl cartoon-border">
+<div class="flex items-center justify-between text-xs font-bold">
+<span class="text-[#759aab]">Auth Window</span>
+<span class="font-black text-[#453f78]">6h 12m left ⏳</span>
+</div>
+<div class="h-2.5 w-full bg-white rounded-full cartoon-border overflow-hidden">
+<div class="h-full bg-[#453f78] rounded-full" style="width: 48%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs font-black text-[#401f3e] bg-[#faf2a1] px-2 py-0.5 rounded-lg cartoon-border">3 Orders</span>
+<button class="text-[#453f78] hover:text-[#401f3e] font-black text-xs flex items-center gap-0.5 underline">
+                Auto Capture →
+              </button>
+</div>
+</div>
+<!-- 3. Instant Payout Vault Hero Box (Vanilla Custard Cartoon Accent) -->
+<div class="bg-[#faf2a1] rounded-3xl p-5 cartoon-border-3 cartoon-shadow-lg flex flex-col justify-between hover:-translate-y-1 transition-transform">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="text-[11px] font-black text-[#453f78] uppercase tracking-wider">Vault Available</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-['Rubik'] text-2xl font-black text-[#401f3e]">14,820.500</span>
+<span class="text-[11px] font-black text-[#453f78] ml-1">BHD</span>
+</div>
+</div>
+<div class="w-11 h-11 rounded-2xl bg-white cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+</div>
+<div class="my-2 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded-lg bg-white cartoon-border text-[11px] font-black text-[#401f3e]">IBAN BH92•••4012</span>
+<span class="text-[11px] font-bold text-[#453f78] flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[14px]">lock</span> Escrow
+              </span>
+</div>
+<div class="pt-1">
+<button class="w-full py-2.5 px-3 rounded-2xl bg-[#453f78] text-[#faf2a1] hover:bg-[#3f2e56] font-['Rubik'] font-black text-xs cartoon-border cartoon-shadow cartoon-shadow-active flex items-center justify-center gap-1.5 transition-all" id="payoutBtn" onclick="triggerPayout()">
+<span class="material-symbols-outlined text-[18px]">flash_on</span>
+<span>One-Click Settlement</span>
+</button>
+</div>
+</div>
+<!-- 4. Gamified Gateway Reliability -->
+<div class="bg-white rounded-3xl p-5 cartoon-border-3 cartoon-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="text-[11px] font-black text-[#759aab] uppercase tracking-wider">Gateway Reliability</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-['Rubik'] text-2xl font-black text-[#401f3e]">99.4%</span>
+<span class="px-1.5 py-0.5 rounded-md bg-[#dbe8ee] cartoon-border font-['Rubik'] text-[10px] font-black text-[#401f3e]">SLA</span>
+</div>
+</div>
+<div class="w-11 h-11 rounded-2xl bg-[#dbe8ee] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="my-2.5 flex items-center gap-2.5 bg-[#faf8f2] p-2 rounded-xl cartoon-border">
+<span class="px-2 py-1 bg-[#453f78] text-white rounded-lg cartoon-border font-['Rubik'] text-xs font-black">TIER S+</span>
+<div class="flex flex-col">
+<span class="text-xs font-black text-[#401f3e]">Fawri+ Optimized</span>
+<span class="text-[10px] font-bold text-[#759aab]">0 Chargebacks</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs font-bold text-[#759aab]">142ms latency</span>
+<span class="text-xs font-black text-[#453f78] flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-[#faf2a1] cartoon-border"></span> 100% Uptime
+              </span>
+</div>
+</div>
+</div>
+<!-- Main Asymmetric Workspace Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-7">
+<!-- Left 8-Column Panel: Quests & Live Transaction Flow -->
+<div class="lg:col-span-8 flex flex-col gap-7">
+<!-- Daily Fintech Quests Section -->
+<div class="bg-white rounded-3xl p-6 cartoon-border-3 cartoon-shadow flex flex-col gap-5">
+<div class="flex items-center justify-between pb-1 border-b-2 border-[#401f3e]/10">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-2xl bg-[#faf2a1] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">assignment_turned_in</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-['Rubik'] text-lg font-black text-[#401f3e]">Daily Vault Quests</span>
+<span class="px-2 py-0.5 rounded-full bg-[#faf2a1] cartoon-border text-[10px] font-black text-[#401f3e]">REWARDS READY</span>
+</div>
+<span class="text-xs font-bold text-[#759aab]">Complete operational milestones to earn fee discounts &amp; XP multipliers</span>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full bg-[#f0edf9] cartoon-border font-['Rubik'] text-xs font-black text-[#453f78]">2 of 3 Done</span>
+</div>
+<!-- Quests Stack -->
+<div class="flex flex-col gap-3.5">
+<!-- Quest 1: Active Progress -->
+<div class="p-4 bg-[#faf8f2] rounded-2xl cartoon-border cartoon-shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#faf2a1]/25 transition-colors">
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-2xl bg-[#faf2a1] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e] flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">rocket_launch</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Capture 25 BHD+ transactions before 6 PM</span>
+<span class="px-2 py-0.5 rounded-md bg-[#453f78] text-[#faf2a1] cartoon-border text-[10px] font-black">+50 XP</span>
+</div>
+<span class="text-xs font-semibold text-[#759aab]">Speed settlement bonus to unlock 1.2x boost on next batch payout.</span>
+<!-- Chunky Mini Progress -->
+<div class="w-full sm:w-64 h-3 bg-white cartoon-border rounded-full overflow-hidden mt-1 p-0.5">
+<div class="h-full bg-[#453f78] rounded-full" style="width: 72%"></div>
+</div>
+</div>
+</div>
+<div class="flex sm:flex-col items-center sm:items-end justify-between gap-1 flex-shrink-0">
+<span class="font-['Rubik'] text-sm font-black text-[#401f3e] bg-white px-2 py-0.5 rounded-lg cartoon-border">18 / 25</span>
+<span class="text-[11px] font-bold text-[#759aab]">Ends in 2h 45m</span>
+</div>
+</div>
+<!-- Quest 2: Near Completion -->
+<div class="p-4 bg-[#faf8f2] rounded-2xl cartoon-border cartoon-shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#faf2a1]/25 transition-colors">
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-2xl bg-[#dbe8ee] cartoon-border cartoon-shadow-sm flex items-center justify-center text-[#401f3e] flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">shield</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Zero Dispute Week (Chargeback Shield)</span>
+<span class="px-2 py-0.5 rounded-md bg-[#faf2a1] text-[#401f3e] cartoon-border text-[10px] font-black">0.10% MDR Rebate</span>
+</div>
+<span class="text-xs font-semibold text-[#759aab]">Maintain frictionless authentication via BenefitPay tokenized 3DS2.</span>
+<div class="w-full sm:w-64 h-3 bg-white cartoon-border rounded-full overflow-hidden mt-1 p-0.5">
+<div class="h-full bg-[#759aab] rounded-full" style="width: 71.4%"></div>
+</div>
+</div>
+</div>
+<div class="flex sm:flex-col items-center sm:items-end justify-between gap-1 flex-shrink-0">
+<span class="font-['Rubik'] text-sm font-black text-[#453f78] bg-white px-2 py-0.5 rounded-lg cartoon-border">Day 5 of 7</span>
+<span class="text-[11px] font-bold text-[#759aab]">Active Protection</span>
+</div>
+</div>
+<!-- Quest 3: Completed Claimed -->
+<div class="p-4 bg-[#f5f2eb]/70 rounded-2xl cartoon-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-90">
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-2xl bg-white cartoon-border flex items-center justify-center text-[#759aab] flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">receipt</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-['Rubik'] text-xs font-black text-[#759aab] line-through">Export Settlement Reconciliation</span>
+<span class="px-2 py-0.5 rounded-md bg-white text-[#759aab] cartoon-border text-[10px] font-bold">+30 XP Claimed</span>
+</div>
+<span class="text-xs font-medium text-[#759aab]">Monthly audited CSV ledger exported for Alpha Accounting.</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 bg-[#faf2a1] rounded-full cartoon-border text-[#401f3e]">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-xs font-black">Completed</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Transactions Table Ledger (2D Cartoon Light Mode) -->
+<div class="bg-white rounded-3xl p-6 cartoon-border-3 cartoon-shadow flex flex-col gap-5">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b-2 border-[#401f3e]/10">
+<div class="flex flex-col">
+<span class="font-['Rubik'] text-lg font-black text-[#401f3e]">Recent Ledger Records</span>
+<span class="text-xs font-bold text-[#759aab]">Live audit pipeline synced directly with the Central Bank of Bahrain gateway</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 rounded-xl bg-[#faf8f2] text-[#401f3e] cartoon-border cartoon-shadow-sm font-['Rubik'] text-xs font-bold hover:bg-[#faf2a1] transition-colors">
+                    Filter Status
+                  </button>
+<a class="px-3 py-1.5 rounded-xl bg-[#453f78] text-white cartoon-border cartoon-shadow-sm font-['Rubik'] text-xs font-bold hover:bg-[#3f2e56] transition-colors flex items-center gap-1" href="#">
+<span>View Full 25 Txns</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs font-medium border-collapse">
+<thead>
+<tr class="text-[#401f3e] font-['Rubik'] text-[11px] font-black uppercase tracking-wider bg-[#faf2a1] cartoon-border rounded-xl">
+<th class="py-3 px-3.5 rounded-l-xl border-y-2 border-l-2 border-[#401f3e]">Occurred</th>
+<th class="py-3 px-3.5 border-y-2 border-[#401f3e]">Txn Reference</th>
+<th class="py-3 px-3.5 border-y-2 border-[#401f3e]">Status</th>
+<th class="py-3 px-3.5 text-right border-y-2 border-[#401f3e]">Authorized</th>
+<th class="py-3 px-3.5 text-right border-y-2 border-[#401f3e]">Captured (BHD)</th>
+<th class="py-3 px-3.5 rounded-r-xl border-y-2 border-r-2 border-[#401f3e]">Acquirer Gateway</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-[#401f3e]/10">
+<!-- Row 1 -->
+<tr class="hover:bg-[#faf8f2] transition-colors group cursor-pointer">
+<td class="py-3 px-3.5 font-bold text-[#759aab]">30/08/2026, 11:43:40</td>
+<td class="py-3 px-3.5">
+<span class="font-['Rubik'] font-bold text-[#453f78] group-hover:underline">alpha-retail-txn-0009</span>
+</td>
+<td class="py-3 px-3.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#faf2a1] text-[#401f3e] cartoon-border text-[10px] font-black">
+<span class="w-1.5 h-1.5 rounded-full bg-[#401f3e]"></span> Captured
+                        </span>
+</td>
+<td class="py-3 px-3.5 text-right font-bold text-[#759aab]">426.987</td>
+<td class="py-3 px-3.5 text-right font-['Rubik'] font-black text-[#401f3e]">426.987</td>
+<td class="py-3 px-3.5 font-mono text-[#759aab] truncate max-w-[130px]">acq_407f08...6c3a</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-[#faf8f2] transition-colors group cursor-pointer">
+<td class="py-3 px-3.5 font-bold text-[#759aab]">30/08/2026, 06:12:06</td>
+<td class="py-3 px-3.5">
+<span class="font-['Rubik'] font-bold text-[#453f78] group-hover:underline">alpha-retail-txn-0029</span>
+</td>
+<td class="py-3 px-3.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#faf2a1] text-[#401f3e] cartoon-border text-[10px] font-black">
+<span class="w-1.5 h-1.5 rounded-full bg-[#401f3e]"></span> Captured
+                        </span>
+</td>
+<td class="py-3 px-3.5 text-right font-bold text-[#759aab]">496.948</td>
+<td class="py-3 px-3.5 text-right font-['Rubik'] font-black text-[#401f3e]">496.948</td>
+<td class="py-3 px-3.5 font-mono text-[#759aab] truncate max-w-[130px]">acq_caa712...ed55</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-[#faf8f2] transition-colors group cursor-pointer">
+<td class="py-3 px-3.5 font-bold text-[#759aab]">30/08/2026, 04:05:56</td>
+<td class="py-3 px-3.5">
+<span class="font-['Rubik'] font-bold text-[#453f78] group-hover:underline">alpha-retail-txn-0031</span>
+</td>
+<td class="py-3 px-3.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#faf2a1] text-[#401f3e] cartoon-border text-[10px] font-black">
+<span class="w-1.5 h-1.5 rounded-full bg-[#401f3e]"></span> Captured
+                        </span>
+</td>
+<td class="py-3 px-3.5 text-right font-bold text-[#759aab]">57.006</td>
+<td class="py-3 px-3.5 text-right font-['Rubik'] font-black text-[#401f3e]">57.006</td>
+<td class="py-3 px-3.5 font-mono text-[#759aab] truncate max-w-[130px]">acq_abaf62...e3b0</td>
+</tr>
+<!-- Row 4: Partial Auth -->
+<tr class="hover:bg-[#faf8f2] transition-colors group cursor-pointer">
+<td class="py-3 px-3.5 font-bold text-[#759aab]">29/08/2026, 23:45:48</td>
+<td class="py-3 px-3.5">
+<span class="font-['Rubik'] font-bold text-[#453f78] group-hover:underline">alpha-retail-txn-0016</span>
+</td>
+<td class="py-3 px-3.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#dbe8ee] text-[#401f3e] cartoon-border text-[10px] font-black">
+<span class="w-1.5 h-1.5 rounded-full bg-[#453f78]"></span> Partial Auth
+                        </span>
+</td>
+<td class="py-3 px-3.5 text-right font-bold text-[#759aab]">318.329</td>
+<td class="py-3 px-3.5 text-right font-['Rubik'] font-black text-[#453f78]">238.747</td>
+<td class="py-3 px-3.5 font-mono text-[#759aab] truncate max-w-[130px]">acq_56f3f3...8971</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-[#faf8f2] transition-colors group cursor-pointer">
+<td class="py-3 px-3.5 font-bold text-[#759aab]">29/08/2026, 23:09:49</td>
+<td class="py-3 px-3.5">
+<span class="font-['Rubik'] font-bold text-[#453f78] group-hover:underline">alpha-retail-txn-0001</span>
+</td>
+<td class="py-3 px-3.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#faf2a1] text-[#401f3e] cartoon-border text-[10px] font-black">
+<span class="w-1.5 h-1.5 rounded-full bg-[#401f3e]"></span> Captured
+                        </span>
+</td>
+<td class="py-3 px-3.5 text-right font-bold text-[#759aab]">150.031</td>
+<td class="py-3 px-3.5 text-right font-['Rubik'] font-black text-[#401f3e]">150.031</td>
+<td class="py-3 px-3.5 font-mono text-[#759aab] truncate max-w-[130px]">acq_ef47b4...4569</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right 4-Column Secondary Panel: Operational Actions & Signals -->
+<div class="lg:col-span-4 flex flex-col gap-6">
+<!-- Rapid Actions Bento Block (Playful 2D Buttons) -->
+<div class="bg-white rounded-3xl p-6 cartoon-border-3 cartoon-shadow flex flex-col gap-4">
+<div class="flex items-center justify-between pb-1">
+<span class="font-['Rubik'] text-base font-black text-[#401f3e]">Quick Actions</span>
+<span class="material-symbols-outlined text-[#759aab] text-[20px] font-bold">more_vert</span>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-[#faf8f2] hover:bg-[#faf2a1] cartoon-border cartoon-shadow-sm cartoon-shadow-active transition-all group text-center gap-1.5">
+<div class="w-10 h-10 rounded-xl bg-white group-hover:bg-[#401f3e] group-hover:text-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e] transition-colors">
+<span class="material-symbols-outlined text-[20px]">add_link</span>
+</div>
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Payment Link</span>
+<span class="text-[10px] font-bold text-[#759aab]">Share URL/QR</span>
+</button>
+<button class="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-[#faf8f2] hover:bg-[#faf2a1] cartoon-border cartoon-shadow-sm cartoon-shadow-active transition-all group text-center gap-1.5">
+<div class="w-10 h-10 rounded-xl bg-white group-hover:bg-[#401f3e] group-hover:text-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e] transition-colors">
+<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+</div>
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Virtual POS</span>
+<span class="text-[10px] font-bold text-[#759aab]">Manual Input</span>
+</button>
+<button class="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-[#faf8f2] hover:bg-[#faf2a1] cartoon-border cartoon-shadow-sm cartoon-shadow-active transition-all group text-center gap-1.5">
+<div class="w-10 h-10 rounded-xl bg-white group-hover:bg-[#401f3e] group-hover:text-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e] transition-colors">
+<span class="material-symbols-outlined text-[20px]">download_for_offline</span>
+</div>
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Tax Invoice</span>
+<span class="text-[10px] font-bold text-[#759aab]">NBR Certified</span>
+</button>
+<button class="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-[#faf8f2] hover:bg-[#faf2a1] cartoon-border cartoon-shadow-sm cartoon-shadow-active transition-all group text-center gap-1.5">
+<div class="w-10 h-10 rounded-xl bg-white group-hover:bg-[#401f3e] group-hover:text-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e] transition-colors">
+<span class="material-symbols-outlined text-[20px]">sync_alt</span>
+</div>
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Batch Capture</span>
+<span class="text-[10px] font-bold text-[#759aab]">3 Queued</span>
+</button>
+</div>
+</div>
+<!-- Merchant Terminal Identity Card -->
+<div class="bg-white rounded-3xl p-6 cartoon-border-3 cartoon-shadow flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="font-['Rubik'] text-base font-black text-[#401f3e]">Terminal Context</span>
+<span class="px-2.5 py-0.5 rounded-full bg-[#faf2a1] cartoon-border font-['Rubik'] text-[10px] font-black text-[#401f3e]">PROD</span>
+</div>
+<!-- Cartoonized Visual Terminal Badge Banner -->
+<div class="relative rounded-2xl overflow-hidden h-32 bg-[#453f78] cartoon-border flex flex-col justify-end p-4 shadow-inner">
+<div class="absolute inset-0 opacity-15" style="background-image: radial-gradient(#faf2a1 2px, transparent 2px); background-size: 14px 14px;"></div>
+<div class="relative z-10 flex items-center justify-between text-white">
+<div class="flex flex-col">
+<span class="text-[10px] font-black uppercase tracking-wider text-[#faf2a1]">Custody Node</span>
+<span class="font-['Rubik'] text-lg font-black tracking-tight">Manama_Vault_09</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e]">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2 pt-1 text-xs">
+<div class="flex items-center justify-between p-2 rounded-xl bg-[#faf8f2] cartoon-border">
+<span class="font-bold text-[#759aab]">Terminal ID (TID)</span>
+<span class="font-['Rubik'] font-black text-[#401f3e]">BHD-9082-ALPHA-01</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-xl bg-[#faf8f2] cartoon-border">
+<span class="font-bold text-[#759aab]">Primary Acquirer</span>
+<span class="font-bold text-[#401f3e]">National Bank of Bahrain</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-xl bg-[#faf8f2] cartoon-border">
+<span class="font-bold text-[#759aab]">Settlement Cycle</span>
+<span class="font-['Rubik'] font-black text-[#453f78]">T+0 Instant Fawri+</span>
+</div>
+</div>
+</div>
+<!-- Settlement Signals Stream Card -->
+<div class="bg-white rounded-3xl p-6 cartoon-border-3 cartoon-shadow flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-['Rubik'] text-base font-black text-[#401f3e]">Settlement Signals</span>
+<span class="w-2.5 h-2.5 rounded-full bg-[#faf2a1] cartoon-border"></span>
+</div>
+<span class="px-2 py-0.5 rounded-md bg-[#f0edf9] text-[#453f78] text-[10px] font-bold cartoon-border">LIVE</span>
+</div>
+<div class="flex flex-col gap-3 divide-y-2 divide-[#401f3e]/10">
+<div class="pt-2 flex items-start gap-3">
+<div class="w-8 h-8 rounded-xl bg-[#faf2a1] cartoon-border flex items-center justify-center text-[#401f3e] flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">swap_calls</span>
+</div>
+<div class="flex flex-col">
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Batch Settlement Cleared</span>
+<span class="text-xs font-semibold text-[#759aab]">+8,450.000 BHD dispatched to Corporate Treasury</span>
+<span class="text-[10px] font-bold text-[#453f78] mt-0.5">14 minutes ago</span>
+</div>
+</div>
+<div class="pt-3 flex items-start gap-3">
+<div class="w-8 h-8 rounded-xl bg-[#dbe8ee] cartoon-border flex items-center justify-center text-[#401f3e] flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</div>
+<div class="flex flex-col">
+<span class="font-['Rubik'] text-xs font-black text-[#401f3e]">Compliance Seal Renewed</span>
+<span class="text-xs font-semibold text-[#759aab]">PCI-DSS Level 1 &amp; CBB sandbox validated</span>
+<span class="text-[10px] font-bold text-[#453f78] mt-0.5">Today, 09:30 AM</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+    function triggerPayout() {
+      const btn = document.getElementById('payoutBtn');
+      if (!btn) return;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span><span>Settling Vault Transfer...</span>`;
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">check_circle</span><span>14,820.500 BHD Settled! 🎉</span>`;
+        btn.classList.remove('bg-[#453f78]', 'text-[#faf2a1]');
+        btn.classList.add('bg-[#faf2a1]', 'text-[#401f3e]');
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.classList.remove('bg-[#faf2a1]', 'text-[#401f3e]');
+          btn.classList.add('bg-[#453f78]', 'text-[#faf2a1]');
+          btn.disabled = false;
+        }, 3500);
+      }, 1200);
+    }
+  </script>
+</body></html>

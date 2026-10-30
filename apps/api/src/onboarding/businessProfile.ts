@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { NotFoundError } from "../lib/errors.js";
-import { todayStamp } from "../lib/dateUtil.js";
+import { formatIsoDate } from "../lib/dateFormat.js";
 
 export interface BusinessProfile {
   merchantId: string;
@@ -126,6 +126,6 @@ export async function updateBusinessProfile(
   if (!row) {
     throw new NotFoundError("business_profile_not_found");
   }
-  console.log(`[businessProfile] updated on ${todayStamp()}`);
+  console.log(`[businessProfile] updated on ${formatIsoDate(new Date())}`);
   return toBusinessProfile(row);
 }

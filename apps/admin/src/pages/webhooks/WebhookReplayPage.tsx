@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getMerchant, listMerchants } from "../../api/merchants.js";
 import { replayBatch } from "../../api/webhooks.js";
 import { describeError } from "../../api/client.js";
+import { bahrainInputToIso, bahrainInputValue } from "../../format.js";
 import type {
   AdminMerchantDetail,
   AdminMerchantSummary,
@@ -17,19 +18,10 @@ const REPLAYABLE_STATUSES: WebhookDeliveryStatus[] = [
   "succeeded",
 ];
 
-/** `<input type="datetime-local">` wants a local-time `YYYY-MM-DDTHH:mm`
- *  string; the API wants ISO-8601 instants. Convert at both edges rather
- *  than making the operator think about timezones. */
-function toLocalInputValue(date: Date): string {
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
-// default window is local time — am
+/** The inputs hold Bahrain wall time; the API wants ISO-8601 instants. */
 function defaultRange(): { from: string; to: string } {
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  return { from: toLocalInputValue(weekAgo), to: toLocalInputValue(now) };
+  const now = Date.now();
+  return { from: bahrainInputValue(now - 7 * 24 * 60 * 60 * 1000), to: bahrainInputValue(now) };
 }
 
 /**
@@ -100,8 +92,8 @@ export function WebhookReplayPage() {
     try {
       setResult(
         await replayBatch(merchantId, endpointId, {
-          from: new Date(range.from).toISOString(),
-          to: new Date(range.to).toISOString(),
+          from: bahrainInputToIso(range.from),
+          to: bahrainInputToIso(range.to),
           statuses: statuses.length > 0 ? statuses : undefined,
         }),
       );
@@ -182,7 +174,7 @@ export function WebhookReplayPage() {
           </select>
         </label>
         <label>
-          From
+          From (Bahrain time)
           <input
             type="datetime-local"
             required
@@ -191,7 +183,7 @@ export function WebhookReplayPage() {
           />
         </label>
         <label>
-          To
+          To (Bahrain time)
           <input
             type="datetime-local"
             required

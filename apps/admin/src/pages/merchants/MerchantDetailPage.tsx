@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatBhd, parseBhdToFils, toFils } from "@filspay/money";
-import { dateOnly, dateTime } from "../../format.js";
+import { bahrainToday, dateOnly, dateTime } from "../../format.js";
 import { getMerchant, recomputeTransactionStatuses, setRefundsEnabled, submitKycReview } from "../../api/merchants.js";
 import { adjustBalance } from "../../api/balanceAdjustments.js";
 import { issueCredit } from "../../api/credits.js";
@@ -14,14 +14,6 @@ import type { AdminMerchantDetail, CreditReasonCode, RotatedApiKey } from "../..
 
 function bhd(fils: number): string {
   return `${formatBhd(toFils(fils, { allowNegative: true }))} BHD`;
-}
-
-// browser local date not bahrain, fine for bahrain staff — am
-function todayIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate(),
-  ).padStart(2, "0")}`;
 }
 
 export function MerchantDetailPage() {
@@ -48,7 +40,7 @@ export function MerchantDetailPage() {
   const [creditReason, setCreditReason] = useState<CreditReasonCode>("goodwill");
   const [creditMemo, setCreditMemo] = useState("");
   const [creditReverseFee, setCreditReverseFee] = useState(false);
-  const [creditEffectiveDate, setCreditEffectiveDate] = useState(todayIso());
+  const [creditEffectiveDate, setCreditEffectiveDate] = useState(() => bahrainToday());
 
   const [adjustDeltaFils, setAdjustDeltaFils] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
@@ -419,7 +411,7 @@ export function MerchantDetailPage() {
             </select>
           </label>
           <label>
-            Effective date
+            Effective date (Bahrain)
             <input
               type="date"
               required

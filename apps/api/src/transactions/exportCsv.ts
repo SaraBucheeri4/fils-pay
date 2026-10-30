@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { formatBhd, toFils } from "@filspay/money";
+import { formatBahrainInstant } from "../lib/dateFormat.js";
 import type { TransactionRow } from "./serialize.js";
 
 export interface TransactionsExportFilters {
@@ -26,7 +27,7 @@ function toCsvRow(row: TransactionRow): string {
     formatBhd(toFils(Number(row.amount_fils), { allowNegative: true })),
     formatBhd(toFils(Number(row.captured_fils), { allowNegative: true })),
     csvEscape(row.reference ?? ""),
-    row.occurred_at.toISOString(),
+    formatBahrainInstant(row.occurred_at),
   ].join(",");
 }
 

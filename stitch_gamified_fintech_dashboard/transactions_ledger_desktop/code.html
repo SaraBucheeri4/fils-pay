@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_dashboard" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Rubik:wght@600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+    }
+    ::-webkit-scrollbar { display: none; }
+    .cartoon-shadow {
+      box-shadow: 4px 4px 0px #401f3e;
+    }
+    .cartoon-shadow-sm {
+      box-shadow: 2.5px 2.5px 0px #401f3e;
+    }
+    .cartoon-shadow-lg {
+      box-shadow: 6px 6px 0px #401f3e;
+    }
+    .cartoon-border {
+      border: 2.5px solid #401f3e;
+    }
+    .cartoon-border-b {
+      border-bottom: 2.5px solid #401f3e;
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "midnight": "#401f3e",
+            "grape": "#3f2e56",
+            "french-blue": "#453f78",
+            "steel-blue": "#759aab",
+            "steel-blue-light": "#d8e5ec",
+            "custard": "#faf2a1",
+            "custard-dark": "#e8dc6e",
+            "bg-cream": "#faf8f2",
+            "card-cream": "#ffffff",
+            "pill-bg": "#f0edf7",
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Rubik"', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-[#faf8f2] font-sans text-midnight antialiased min-h-screen">
+<!-- SIDEBAR (Playful 2D Cartoon Style) -->
+<aside class="fixed left-0 top-0 h-full w-72 bg-white z-50 flex flex-col justify-between py-5 border-r-[3px] border-midnight select-none">
+<div class="flex flex-col gap-4">
+<!-- App Logo / Header -->
+<div class="px-5 flex items-center gap-3">
+<div class="w-11 h-11 rounded-2xl bg-custard border-2 border-midnight flex items-center justify-center cartoon-shadow-sm">
+<span class="material-symbols-outlined text-midnight font-bold text-[24px]">token</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display font-black text-xl text-midnight tracking-tight flex items-center gap-1.5">
+            FilsPay
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-custard border border-midnight font-display uppercase tracking-wider font-bold">BHD</span>
+</span>
+<span class="font-display text-[11px] font-bold text-french-blue uppercase tracking-wider">Vault Engine 2.0</span>
+</div>
+</div>
+<!-- Active Merchant Picker -->
+<div class="mx-4 p-3 bg-pill-bg rounded-2xl border-2 border-midnight cartoon-shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-xl bg-custard border border-midnight flex items-center justify-center text-midnight">
+<span class="material-symbols-outlined text-[18px]">store</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display text-[10px] uppercase font-bold text-french-blue">Active Merchant</span>
+<span class="font-display text-xs font-bold text-midnight truncate max-w-[125px]">Alpha Retail Co</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-midnight text-[20px] font-bold">unfold_more</span>
+</div>
+<!-- Navigation Links -->
+<nav class="px-3 flex flex-col gap-1.5">
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="overview-hub" href="#">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span>Overview / Hub</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 bg-custard text-midnight font-display font-bold text-sm rounded-xl border-2 border-midnight cartoon-shadow-sm transition-transform" data-path="transactions-ledger-live-feed" href="#">
+<span class="material-symbols-outlined text-[22px] text-midnight">receipt_long</span>
+<span>Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="merchants-admin-multi-entity" href="#">
+<span class="material-symbols-outlined text-[22px]">hub</span>
+<span>Merchants</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="payment-links" href="#">
+<span class="material-symbols-outlined text-[22px]">link</span>
+<span>Payment Links</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="settlement-vault" href="#">
+<span class="material-symbols-outlined text-[22px]">lock</span>
+<span>Settlement &amp; Vault</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="analytics-quests" href="#">
+<span class="material-symbols-outlined text-[22px]">military_tech</span>
+<span>Analytics &amp; Quests</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-2.5 text-grape font-display font-bold text-sm rounded-xl hover:bg-pill-bg hover:translate-x-1 transition-transform" data-path="settings" href="#">
+<span class="material-symbols-outlined text-[22px]">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Sidebar Footer / XP & Tier Widget -->
+<div class="px-4 flex flex-col gap-3">
+<div class="p-3.5 bg-pill-bg rounded-2xl border-2 border-midnight cartoon-shadow-sm flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-display text-[11px] font-extrabold text-midnight uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-french-blue">stars</span> 2,450 XP
+          </span>
+<span class="px-2 py-0.5 rounded-full bg-custard border border-midnight font-display text-[10px] font-black text-midnight">Lvl 8</span>
+</div>
+<div class="w-full h-3 bg-white border border-midnight rounded-full overflow-hidden p-[1px]">
+<div class="h-full bg-french-blue rounded-full w-3/4 border-r border-midnight"></div>
+</div>
+<span class="font-sans text-[11px] font-semibold text-grape">550 XP to Diamond Tier II</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 bg-white rounded-xl border border-midnight">
+<span class="material-symbols-outlined text-french-blue text-[18px]">verified_user</span>
+<span class="font-sans text-xs font-bold text-grape truncate">BHD Vault Custody v4.2</span>
+</div>
+</div>
+</aside>
+<!-- MAIN WRAPPER -->
+<div class="pl-72 min-h-screen flex flex-col">
+<!-- TOP APP BAR -->
+<header class="sticky top-0 h-16 bg-[#faf8f2]/95 backdrop-blur-md border-b-[3px] border-midnight z-40 flex items-center justify-between px-8">
+<div class="flex items-center gap-4 flex-1 max-w-md">
+<div class="flex items-center gap-2 w-full px-4 py-2 bg-white rounded-2xl border-2 border-midnight cartoon-shadow-sm text-midnight">
+<span class="material-symbols-outlined text-[20px] text-midnight font-bold">search</span>
+<input class="bg-transparent w-full text-midnight placeholder:text-gray-400 focus:outline-none font-sans text-xs font-semibold" placeholder="Search transactions, invoices, hash..." type="text"/>
+</div>
+</div>
+<!-- Quick Badges & Profile -->
+<div class="flex items-center gap-3">
+<!-- 24h Streak -->
+<div class="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-custard rounded-2xl border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold text-midnight">
+<span class="material-symbols-outlined text-midnight text-[17px] font-bold">local_fire_department</span>
+<span class="text-[10px] font-extrabold uppercase tracking-wide">24H STREAK:</span>
+<span>14,820.500 BHD</span>
+</div>
+<!-- Diamond Tier Badge -->
+<div class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-2xl border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold text-french-blue">
+<span class="material-symbols-outlined text-french-blue text-[17px]">diamond</span>
+<span>Lvl 8 Diamond</span>
+</div>
+<!-- Quests Badge -->
+<div class="flex items-center gap-1.5 px-3 py-1.5 bg-steel-blue-light rounded-2xl border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold text-midnight cursor-pointer hover:bg-steel-blue transition-colors">
+<span class="material-symbols-outlined text-midnight text-[16px]">verified</span>
+<span>3/4 Quests</span>
+</div>
+<!-- Notification Bell -->
+<button class="w-10 h-10 rounded-2xl bg-white border-2 border-midnight cartoon-shadow-sm flex items-center justify-center text-midnight hover:bg-custard transition-colors relative">
+<span class="material-symbols-outlined text-[20px] font-bold">notifications</span>
+<span class="w-2.5 h-2.5 rounded-full bg-french-blue border border-midnight absolute top-1.5 right-1.5"></span>
+</button>
+<!-- User Profile Pill -->
+<div class="flex items-center gap-2.5 pl-2">
+<div class="hidden md:flex flex-col text-right">
+<span class="font-display text-xs font-extrabold text-midnight">Alpha Owner</span>
+<span class="font-sans text-[11px] font-semibold text-grape truncate max-w-[130px]">owner@alpharetail.ex</span>
+</div>
+<div class="w-10 h-10 rounded-2xl bg-custard border-2 border-midnight cartoon-shadow-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-midnight font-bold text-[22px]">person</span>
+</div>
+</div>
+</div>
+</header>
+<!-- CONTENT BODY -->
+<main class="w-full px-8 py-6 flex-1 flex flex-col gap-6">
+<!-- Title & Live Feed Status Header -->
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-3">
+<h1 class="font-display font-black text-3xl text-midnight tracking-tight">Transactions Ledger</h1>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-custard border-2 border-midnight cartoon-shadow-sm text-midnight font-display text-xs font-extrabold uppercase">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-french-blue opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-french-blue border border-midnight"></span>
+</span>
+<span>Live Feed Active</span>
+</div>
+<span class="px-2.5 py-1 rounded-xl bg-white border-2 border-midnight font-display text-xs font-bold text-grape cartoon-shadow-sm">25 Loaded</span>
+</div>
+<p class="font-sans text-xs font-semibold text-grape">Real-time custody ledger synchronized with Central Bank of Bahrain RTGS clearing relay.</p>
+</div>
+<!-- Quick Top Metrics Cards -->
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border-2 border-midnight cartoon-shadow-sm">
+<div class="w-9 h-9 rounded-xl bg-steel-blue-light border-2 border-midnight flex items-center justify-center text-midnight font-bold">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display text-[10px] uppercase font-bold text-grape">Settled Today</span>
+<span class="font-display text-base font-black text-midnight">3,497.820 <span class="text-xs text-french-blue font-extrabold">BHD</span></span>
+</div>
+</div>
+<div class="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border-2 border-midnight cartoon-shadow-sm">
+<div class="w-9 h-9 rounded-xl bg-custard border-2 border-midnight flex items-center justify-center text-midnight font-bold">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display text-[10px] uppercase font-bold text-grape">Velocity Rate</span>
+<span class="font-display text-base font-black text-midnight">99.8% <span class="text-xs font-sans text-grape font-bold">(0.18s)</span></span>
+</div>
+</div>
+<button class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-french-blue text-white font-display text-xs font-black border-2 border-midnight cartoon-shadow hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all active:scale-95" id="exportBtn" onclick="triggerExportToast()">
+<span class="material-symbols-outlined text-[18px]">download</span>
+<span>Export CSV</span>
+<span class="px-2 py-0.5 rounded-full bg-custard text-midnight border border-midnight font-display text-[10px] font-black">+10 XP</span>
+</button>
+</div>
+</div>
+<!-- FILTER & SEARCH COCKPIT -->
+<div class="p-4 bg-white rounded-3xl border-[3px] border-midnight cartoon-shadow flex flex-col gap-3">
+<!-- Row 1: Status Filter Chips with Counts -->
+<div class="flex flex-wrap items-center justify-between gap-3 pb-2 border-b-2 border-midnight/10">
+<div class="flex flex-wrap items-center gap-2" id="statusFilterPills">
+<button class="status-filter-pill active flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-french-blue text-white border-2 border-midnight cartoon-shadow-sm font-display text-xs font-black transition-all" data-status="all">
+<span>All Records</span>
+<span class="px-2 py-0.5 rounded-full bg-custard text-midnight border border-midnight text-[11px] font-black">25</span>
+</button>
+<button class="status-filter-pill flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-pill-bg text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-all" data-status="captured">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-midnight"></span>
+<span>Captured</span>
+<span class="px-2 py-0.5 rounded-full bg-white text-midnight border border-midnight text-[11px] font-extrabold">20</span>
+</button>
+<button class="status-filter-pill flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-pill-bg text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-all" data-status="partially_captured">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-midnight"></span>
+<span>Partially Captured</span>
+<span class="px-2 py-0.5 rounded-full bg-white text-midnight border border-midnight text-[11px] font-extrabold">2</span>
+</button>
+<button class="status-filter-pill flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-pill-bg text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-all" data-status="authorized">
+<span class="w-2.5 h-2.5 rounded-full bg-sky-400 border border-midnight"></span>
+<span>Authorized</span>
+<span class="px-2 py-0.5 rounded-full bg-white text-midnight border border-midnight text-[11px] font-extrabold">1</span>
+</button>
+<button class="status-filter-pill flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-pill-bg text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-all" data-status="refunded">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-400 border border-midnight"></span>
+<span>Refunded / Void</span>
+<span class="px-2 py-0.5 rounded-full bg-white text-midnight border border-midnight text-[11px] font-extrabold">2</span>
+</button>
+</div>
+<!-- Live Polling & Reset Button -->
+<div class="flex items-center gap-3">
+<label class="flex items-center gap-2 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded-md border-2 border-midnight text-french-blue focus:ring-0 cursor-pointer accent-french-blue" type="checkbox"/>
+<span class="font-display text-xs font-bold text-midnight">Live Polling</span>
+</label>
+<div class="h-4 w-[2px] bg-midnight/20"></div>
+<button class="text-french-blue hover:text-midnight font-display text-xs font-bold flex items-center gap-1 underline decoration-2" onclick="resetFilters()">
+<span class="material-symbols-outlined text-[16px] font-bold">restart_alt</span>
+<span>Reset</span>
+</button>
+</div>
+</div>
+<!-- Row 2: Date Selector & Search Input -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
+<div class="md:col-span-5 flex items-center gap-2">
+<div class="flex items-center gap-2 px-3 py-2 bg-pill-bg rounded-2xl border-2 border-midnight flex-1 cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-midnight font-bold">calendar_today</span>
+<span class="font-display text-[10px] font-black uppercase text-grape">From</span>
+<input class="bg-transparent text-midnight font-sans text-xs font-bold w-full focus:outline-none" type="text" value="26/08/2026"/>
+</div>
+<span class="text-midnight font-black text-sm">→</span>
+<div class="flex items-center gap-2 px-3 py-2 bg-pill-bg rounded-2xl border-2 border-midnight flex-1 cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-midnight font-bold">event</span>
+<span class="font-display text-[10px] font-black uppercase text-grape">To</span>
+<input class="bg-transparent text-midnight font-sans text-xs font-bold w-full focus:outline-none" type="text" value="30/08/2026"/>
+</div>
+</div>
+<div class="md:col-span-5 flex items-center gap-2 px-3 py-2 bg-pill-bg rounded-2xl border-2 border-midnight cartoon-shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-midnight font-bold">search</span>
+<input class="bg-transparent text-midnight font-sans text-xs font-semibold w-full placeholder:text-gray-400 focus:outline-none" id="tableSearchInput" onkeyup="filterLedger()" placeholder="Search reference (alpha-retail-txn...), acquirer hash, or BHD..." type="text"/>
+</div>
+<div class="md:col-span-2 flex items-center">
+<button class="w-full py-2 px-3 rounded-2xl bg-white hover:bg-custard text-midnight border-2 border-midnight cartoon-shadow-sm flex items-center justify-center gap-2 font-display text-xs font-bold transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+<span>More Filters</span>
+</button>
+</div>
+</div>
+</div>
+<!-- MAIN LEDGER TABLE CARD (Cartoon Styled) -->
+<div class="w-full bg-white rounded-3xl border-[3px] border-midnight cartoon-shadow overflow-hidden flex flex-col">
+<!-- Header status bar -->
+<div class="px-5 py-3.5 bg-pill-bg border-b-2 border-midnight flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-display font-black text-xs text-midnight tracking-wider uppercase">Merchant Ledger Feed</span>
+<span class="text-midnight font-bold">•</span>
+<span class="font-sans text-xs font-bold text-grape">Entity: <strong class="text-midnight underline decoration-french-blue decoration-2">Alpha Retail Co (CR-9972)</strong></span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-custard border border-midnight font-display text-xs font-extrabold text-midnight">
+<span class="material-symbols-outlined text-[16px] text-midnight font-bold">shield</span>
+<span>Verified BHD Settlement</span>
+</div>
+</div>
+<!-- Scrollable Table -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left font-sans text-xs" id="ledgerTable">
+<thead>
+<tr class="bg-custard/50 text-midnight font-display text-[11px] font-black uppercase tracking-wider select-none border-b-2 border-midnight">
+<th class="py-3 px-5">Occurred</th>
+<th class="py-3 px-5">Reference</th>
+<th class="py-3 px-5">Status</th>
+<th class="py-3 px-5 text-right">Authorized</th>
+<th class="py-3 px-5 text-right">Captured</th>
+<th class="py-3 px-5">Acquirer Reference</th>
+<th class="py-3 px-5 text-center">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-midnight/10 text-midnight font-semibold" id="ledgerBody">
+<!-- Row 1 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0009', '426.987 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">30/08/2026, 11:43:40</span>
+<span class="block text-[10px] text-grape font-bold">12s ago via BenefitPay</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0009</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">426.987 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">426.987 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_407f08...6c3a8cf0d</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_407f08b39a48918236c3a8cf0d')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight" title="View Receipt"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight" title="Refund"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight" title="Inspect"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0029', '496.948 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">30/08/2026, 06:12:06</span>
+<span class="block text-[10px] text-grape font-bold">5h ago via Mastercard BHD</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0029</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">496.948 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">496.948 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_caa712...ed5524db2</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_caa712...ed5524db2')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0031', '57.006 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">30/08/2026, 04:05:56</span>
+<span class="block text-[10px] text-grape font-bold">7h ago via Apple Pay</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0031</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">57.006 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">57.006 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_abaf62...e3b0e8dab</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_abaf62...e3b0e8dab')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Partially Captured Highlight -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer bg-steel-blue-light/30" onclick="openTxnDrawer('alpha-retail-txn-0016', '238.747 BHD', 'partially_captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">29/08/2026, 23:45:48</span>
+<span class="block text-[10px] text-midnight font-bold">Custom Cart Split</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0016</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-steel-blue-light border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-amber-500 border border-midnight"></span> partially_captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">318.329 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-french-blue text-sm">238.747 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-white px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_56f3f3...89710e1af</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_56f3f3...89710e1af')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0001', '150.031 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">29/08/2026, 23:09:49</span>
+<span class="block text-[10px] text-grape font-bold">1d ago via Visa Debit</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0001</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">150.031 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">150.031 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_ef47b4...4569852ba</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_ef47b4...4569852ba')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0034', '250.806 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">29/08/2026, 05:26:05</span>
+<span class="block text-[10px] text-grape font-bold">POS Terminal #04</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0034</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">250.806 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">250.806 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_da400c...b2fc8118e</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_da400c...b2fc8118e')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 7 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0005', '140.185 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">28/08/2026, 13:51:21</span>
+<span class="block text-[10px] text-grape font-bold">QR Pay Express</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0005</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">140.185 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">140.185 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_814487...e6e8019d2</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_814487...e6e8019d2')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 8: Partially Captured -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer bg-steel-blue-light/30" onclick="openTxnDrawer('alpha-retail-txn-0030', '363.458 BHD', 'partially_captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">27/08/2026, 14:50:23</span>
+<span class="block text-[10px] text-midnight font-bold">Warehouse Partial Auth</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0030</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-steel-blue-light border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-amber-500 border border-midnight"></span> partially_captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">472.024 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-french-blue text-sm">363.458 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-white px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_eae508...6fab93ccf</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_eae508...6fab93ccf')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 9 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-txn-0022', '169.332 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">27/08/2026, 01:03:30</span>
+<span class="block text-[10px] text-grape font-bold">Night Web Checkout</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-txn-0022</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">169.332 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">169.332 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_f2b72f...221a1df33</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_f2b72f...221a1df33')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 10: Multi-Event Batch 0005 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-multi-evt-0005', '120.000 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">26/08/2026, 16:00:00</span>
+<span class="block text-[10px] text-grape font-bold">Batch Settlement Sync</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-multi-evt-0005</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">120.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">120.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_ba457d...33f4d5be7</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_ba457d...33f4d5be7')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 11: Multi-Event Batch 0004 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-multi-evt-0004', '200.000 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">26/08/2026, 15:00:00</span>
+<span class="block text-[10px] text-grape font-bold">Batch Settlement Sync</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-multi-evt-0004</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">200.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">200.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_066464...0f1194d9d</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_066464...0f1194d9d')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 12: Multi-Event Batch 0003 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-multi-evt-0003', '80.000 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">26/08/2026, 14:00:00</span>
+<span class="block text-[10px] text-grape font-bold">Batch Settlement Sync</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-multi-evt-0003</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">80.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">80.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_457002...577b2528b</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_457002...577b2528b')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 13: Multi-Event Batch 0002 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-multi-evt-0002', '150.000 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">26/08/2026, 13:00:00</span>
+<span class="block text-[10px] text-grape font-bold">Batch Settlement Sync</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-multi-evt-0002</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">150.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">150.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_3cce23...c014091fd</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_3cce23...c014091fd')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 14: Multi-Event Batch 0001 -->
+<tr class="hover:bg-custard/20 transition-colors group cursor-pointer" onclick="openTxnDrawer('alpha-retail-multi-evt-0001', '100.000 BHD', 'captured')">
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="text-french-blue font-display font-bold hover:underline">26/08/2026, 12:00:00</span>
+<span class="block text-[10px] text-grape font-bold">Batch Settlement Sync</span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap font-display font-black text-midnight">alpha-retail-multi-evt-0001</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-[11px] font-black text-midnight">
+<span class="w-2 h-2 rounded-full bg-emerald-500 border border-midnight"></span> captured
+                  </span>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-bold text-grape">100.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap text-right font-display font-black text-midnight text-sm">100.000 BHD</td>
+<td class="py-3 px-5 whitespace-nowrap">
+<div class="flex items-center gap-1 font-mono text-[11px]">
+<span class="bg-pill-bg px-2 py-0.5 rounded-lg border border-midnight text-grape font-bold">acq_b565d2...607feb2be</span>
+<button class="text-midnight hover:text-french-blue p-1" onclick="event.stopPropagation(); copyHash('acq_b565d2...607feb2be')"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</td>
+<td class="py-3 px-5 whitespace-nowrap text-center">
+<div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">receipt</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">undo</span></button>
+<button class="p-1 rounded-lg border border-midnight bg-white hover:bg-custard text-midnight"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination Footer -->
+<div class="px-5 py-3.5 bg-pill-bg border-t-2 border-midnight flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="flex items-center gap-2 text-midnight font-sans text-xs font-bold">
+<span>Displaying rows 1–14 of 25 items</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-midnight"></span>
+<span class="text-french-blue font-display">Next batch indexing in 3s</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded-xl bg-white text-grape border-2 border-midnight opacity-50 font-display text-xs font-bold cursor-not-allowed" disabled="">Previous</button>
+<button class="px-3.5 py-1.5 rounded-xl bg-french-blue text-white border-2 border-midnight cartoon-shadow-sm font-display text-xs font-black">1</button>
+<button class="px-3.5 py-1.5 rounded-xl bg-white text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-colors">2</button>
+<button class="px-3.5 py-1.5 rounded-xl bg-white text-midnight hover:bg-custard border-2 border-midnight cartoon-shadow-sm font-display text-xs font-bold transition-colors">Next</button>
+</div>
+</div>
+</div>
+<!-- GAMIFIED QUEST MILESTONE BOX (Vanilla Custard Banner) -->
+<div class="p-5 bg-custard rounded-3xl border-[3px] border-midnight cartoon-shadow relative overflow-hidden">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+<!-- Left side: Quest Milestone progress -->
+<div class="flex items-start gap-4 max-w-2xl">
+<div class="w-14 h-14 rounded-2xl bg-white border-2 border-midnight cartoon-shadow-sm flex items-center justify-center text-midnight shrink-0">
+<span class="material-symbols-outlined text-[32px] text-midnight font-bold">trophy</span>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex flex-wrap items-center gap-2.5">
+<span class="font-display font-black text-xl text-midnight">August Volume Milestone</span>
+<span class="px-3 py-0.5 rounded-full bg-french-blue text-white border-2 border-midnight font-display text-xs font-black">+500 XP &amp; 0.25% MDR Cut</span>
+</div>
+<p class="font-sans text-xs font-bold text-grape">Reach 20,000 BHD settled transaction volume this month to automatically unlock Tier 1 Interchange savings.</p>
+<!-- Progress bar cartoon style -->
+<div class="flex items-center gap-3 mt-1.5">
+<div class="w-72 h-4 bg-white border-2 border-midnight rounded-full overflow-hidden p-0.5 cartoon-shadow-sm">
+<div class="h-full bg-french-blue rounded-full border-r-2 border-midnight transition-all duration-700" style="width: 91.2%;"></div>
+</div>
+<span class="font-display text-xs font-black text-midnight">18,240.650 / 20,000.000 BHD</span>
+<span class="font-display text-xs font-extrabold text-french-blue">(91.2%)</span>
+</div>
+</div>
+</div>
+<!-- Right side: Reward Claim -->
+<div class="flex items-center gap-6 w-full lg:w-auto justify-between lg:justify-end">
+<div class="flex flex-col text-left lg:text-right">
+<span class="font-display text-[10px] font-black text-grape uppercase tracking-wider">Estimated Fee Relief</span>
+<span class="font-display text-2xl font-black text-midnight tracking-tight">142.500 <span class="text-sm font-extrabold text-french-blue">BHD / mo</span></span>
+</div>
+<button class="px-6 py-3 rounded-2xl bg-french-blue text-white font-display text-sm font-black border-2 border-midnight cartoon-shadow hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 transition-all">
+              Claim Quest Perks
+            </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- DETAIL INSPECTION SLIDE DRAWER (Cartoon Light Mode) -->
+<div class="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-white border-l-[3px] border-midnight cartoon-shadow-lg z-50 transform translate-x-full transition-transform duration-300 flex flex-col" id="txnDrawer">
+<div class="p-4 bg-custard border-b-[3px] border-midnight flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-midnight text-[24px] font-bold">verified</span>
+<span class="font-display font-black text-lg text-midnight">Transaction Dossier</span>
+</div>
+<button class="w-8 h-8 rounded-xl bg-white border-2 border-midnight cartoon-shadow-sm flex items-center justify-center text-midnight hover:bg-rose-100 transition-colors" onclick="closeTxnDrawer()">
+<span class="material-symbols-outlined text-[18px] font-bold">close</span>
+</button>
+</div>
+<div class="p-5 flex-1 overflow-y-auto flex flex-col gap-4">
+<!-- Hero Amount Card -->
+<div class="p-4 rounded-2xl bg-pill-bg border-2 border-midnight cartoon-shadow-sm flex flex-col gap-1">
+<span class="font-display text-[10px] font-black text-grape uppercase tracking-wider">Settled Amount</span>
+<div class="flex items-baseline gap-2">
+<span class="font-display text-3xl font-black text-midnight" id="drawerAmount">426.987</span>
+<span class="font-display text-base font-black text-french-blue">BHD</span>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="px-2.5 py-0.5 rounded-full bg-custard border border-midnight font-display text-[11px] font-black text-midnight" id="drawerBadge">captured</span>
+<span class="text-midnight font-bold">•</span>
+<span class="font-sans text-xs font-semibold text-grape">Cleared via RTGS Relay #3</span>
+</div>
+</div>
+<!-- Identification Ledger Block -->
+<div class="flex flex-col gap-2 p-4 bg-white rounded-2xl border-2 border-midnight cartoon-shadow-sm">
+<span class="font-display text-[10px] font-black text-midnight uppercase tracking-wider pb-1 border-b border-midnight/10">Cryptographic Proof &amp; Metadata</span>
+<div class="flex justify-between py-1">
+<span class="text-grape font-sans text-xs font-bold">Reference</span>
+<span class="text-midnight font-display text-xs font-black" id="drawerTxnRef">alpha-retail-txn-0009</span>
+</div>
+<div class="flex justify-between py-1">
+<span class="text-grape font-sans text-xs font-bold">Merchant ID</span>
+<span class="text-midnight font-display text-xs font-bold">CR-9972-BAH</span>
+</div>
+<div class="flex justify-between py-1">
+<span class="text-grape font-sans text-xs font-bold">Terminal Hub</span>
+<span class="text-midnight font-display text-xs font-bold">BHD_POS_SEEF_04</span>
+</div>
+<div class="flex justify-between py-1">
+<span class="text-grape font-sans text-xs font-bold">Acquirer Relay</span>
+<span class="text-french-blue font-mono text-xs font-bold">acq_407f08...6c3a8cf0d</span>
+</div>
+</div>
+<!-- Gamification Reward Boost Card -->
+<div class="p-4 rounded-2xl bg-custard border-2 border-midnight cartoon-shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-white border-2 border-midnight flex items-center justify-center text-midnight font-bold">
+<span class="material-symbols-outlined text-[22px]">stars</span>
+</div>
+<div class="flex flex-col">
+<span class="font-display text-xs font-black text-midnight">Earned 42 XP</span>
+<span class="font-sans text-[11px] font-bold text-grape">Added to August Streak</span>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-white border border-midnight font-display text-[10px] font-black text-french-blue">x1.5 Boost</span>
+</div>
+<!-- Action buttons -->
+<div class="flex flex-col gap-2 mt-auto pt-4">
+<button class="w-full py-3 rounded-2xl bg-french-blue text-white font-display text-xs font-black border-2 border-midnight cartoon-shadow hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all">
+          Print Vault Receipt PDF
+        </button>
+<button class="w-full py-2.5 rounded-2xl bg-white hover:bg-pill-bg text-midnight font-display text-xs font-black border-2 border-midnight cartoon-shadow-sm transition-colors">
+          Issue Full or Partial Reversal
+        </button>
+</div>
+</div>
+</div>
+<!-- TOAST NOTIFICATION -->
+<div class="fixed bottom-6 right-6 bg-custard text-midnight px-4 py-3 rounded-2xl border-[3px] border-midnight cartoon-shadow-lg flex items-center gap-3 transform translate-y-28 opacity-0 transition-all duration-300 z-50" id="toastNotification">
+<div class="w-8 h-8 rounded-xl bg-white border-2 border-midnight flex items-center justify-center text-midnight font-bold">
+<span class="material-symbols-outlined text-[20px]">verified</span>
+</div>
+<span class="font-display text-xs font-black" id="toastMsg">Exported 25 records to CSV (+10 XP gained!)</span>
+</div>
+<!-- INTERACTIVITY SCRIPT -->
+<script>
+    function openTxnDrawer(ref, amount, status) {
+      const drawer = document.getElementById('txnDrawer');
+      document.getElementById('drawerTxnRef').innerText = ref;
+      document.getElementById('drawerAmount').innerText = amount.replace(' BHD', '');
+      const badge = document.getElementById('drawerBadge');
+      badge.innerText = status;
+      drawer.classList.remove('translate-x-full');
+    }
+
+    function closeTxnDrawer() {
+      const drawer = document.getElementById('txnDrawer');
+      drawer.classList.add('translate-x-full');
+    }
+
+    function triggerExportToast() {
+      showToast('Exported 25 records to CSV (+10 XP gained!)');
+    }
+
+    function copyHash(hash) {
+      showToast('Acquirer hash copied to clipboard');
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toastNotification');
+      document.getElementById('toastMsg').innerText = message;
+      toast.classList.remove('translate-y-28', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-28', 'opacity-0');
+      }, 2800);
+    }
+
+    function filterLedger() {
+      const input = document.getElementById('tableSearchInput').value.toLowerCase();
+      const rows = document.querySelectorAll('#ledgerBody tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('tableSearchInput').value = '';
+      filterLedger();
+      document.querySelectorAll('.status-filter-pill').forEach((pill, idx) => {
+        if (idx === 0) {
+          pill.classList.add('active', 'bg-french-blue', 'text-white');
+          pill.classList.remove('bg-pill-bg', 'text-midnight');
+        } else {
+          pill.classList.remove('active', 'bg-french-blue', 'text-white');
+          pill.classList.add('bg-pill-bg', 'text-midnight');
+        }
+      });
+    }
+
+    // Status Filter Pill Interactions
+    document.querySelectorAll('.status-filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.status-filter-pill').forEach(p => {
+          p.classList.remove('active', 'bg-french-blue', 'text-white');
+          p.classList.add('bg-pill-bg', 'text-midnight');
+        });
+        pill.classList.add('active', 'bg-french-blue', 'text-white');
+        pill.classList.remove('bg-pill-bg', 'text-midnight');
+
+        const status = pill.getAttribute('data-status');
+        const rows = document.querySelectorAll('#ledgerBody tr');
+        rows.forEach(row => {
+          if (status === 'all') {
+            row.style.display = '';
+          } else {
+            const rowText = row.innerText.toLowerCase();
+            row.style.display = rowText.includes(status) ? '' : 'none';
+          }
+        });
+      });
+    });
+  </script>
+</body></html>
