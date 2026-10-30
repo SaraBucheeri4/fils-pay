@@ -10,7 +10,6 @@ import (
 // worked out by applying the negotiated discount to the amount first, then
 // BankersRoundDiv-ing the MDR against that discounted amount — the order
 // settlement's reconciliation policy specifies.
-// FH: hand-checked all three rows with claude, the 14 is right
 // am: api shows 15 for the same inputs in the fee preview?? prob a rounding diff, ignore
 func TestComputeSettlementFee(t *testing.T) {
 	cases := []struct {

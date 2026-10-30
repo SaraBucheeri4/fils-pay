@@ -107,7 +107,6 @@ func TestRebuildMerchantBalance_ZeroActivity(t *testing.T) {
 	}
 }
 
-// FH: duplicate of the export test? delete one rebuild impl -- claude suggests keeping FromExport as "more authoritative"
 func TestRebuildAllBalances_OverwritesDriftedCache(t *testing.T) {
 	pool := mustPool(t)
 	merchantID := insertActiveMerchant(t, pool)

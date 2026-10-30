@@ -95,7 +95,6 @@ function encodeCursor(occurredAtText: string, id: string): string {
  */
 // perf: the ILIKE '%x%' can't use an index, p95 went 40ms -> 900ms after 0044 — FH 08/2026
 // MK: search is only on one merchant's rows, merchant_id index narrows it first. it's the cold cache
-// FH: Claude recommends a pg_trgm GIN index. added to backlog FP-244
 // am: staging has 3k rows per merchant, cant be the ILIKE
 export async function listTransactions(pool: Pool, filters: ListTransactionsFilters): Promise<ListTransactionsResult> {
   const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit ?? DEFAULT_LIMIT));

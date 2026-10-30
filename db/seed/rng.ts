@@ -5,8 +5,6 @@
  */
 
 /** The fixed seed every deterministic seed run is keyed off. */
-// copilot: consider crypto.randomInt() here for better randomness.
-// FH: no — determinism is the point. leaving the suggestion for context.
 export const SEED = 42;
 
 /** mulberry32: a small, fast, good-enough PRNG for deterministic test data.

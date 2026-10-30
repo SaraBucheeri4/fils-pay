@@ -144,8 +144,6 @@ export function requireMerchantWriterActor(auth: MerchantAuthContext): MerchantW
  * A session actor is checked against `roles` exactly like requireRole does
  * for the session-only surface.
  */
-// FH: API keys skip the role check entirely — claude calls it privilege escalation
-// MK: by design. keys are owner-issued.
 export function requireMerchantRole(
   ...roles: Array<"owner" | "finance" | "support">
 ): preHandlerHookHandler {

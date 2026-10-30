@@ -16,4 +16,4 @@ CREATE INDEX idx_reporting_saved_filters_merchant
 
 -- FH: transactionsReportQuery builds its WHERE by interpolating these
 -- filter values into the SQL string.
--- AM: they're JSON.parse'd first so they can't carry SQL. (Copilot agrees)
+-- AM: they're JSON.parse'd first so they can't carry SQL.

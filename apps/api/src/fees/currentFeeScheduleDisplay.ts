@@ -23,7 +23,6 @@ export interface CurrentFeeScheduleDisplay {
  */
 // MK 15/06/2026: shouldnt this be effective_from <= now() like feeSchedule.ts? a backdated
 // correction entered today would show as "current"
-// FH: asked Claude, it said created_at is right for "most recently agreed" (see docblock). resolved
 // am: display only, nobody bills off this. leave it
 export async function getCurrentFeeScheduleForDisplay(
   pool: Pool,

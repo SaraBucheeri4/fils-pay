@@ -47,7 +47,6 @@ export function startReportingConsumer(pool: Pool, config: ReportingConfig): Rep
   listenClient.on("error", (err: Error) => {
     console.error("[reporting/consumer] LISTEN client error", err);
   });
-  // copilot: triggerPass already ignores notifications while a pass is running, so no debounce is needed.
   listenClient.on("notification", () => {
     triggerPass();
   });

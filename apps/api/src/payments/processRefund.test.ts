@@ -463,8 +463,6 @@ test("a successful refund enqueues exactly one refund.succeeded outbox event", a
   assert.equal(events.rows[0]!.payload.amountFils, 7_000);
 });
 
-// TODO(FH): add "another merchant's transaction answers 404" — Claude says it's covered
-// by the route test already
 test("unknown transaction ids answer 404", async () => {
   const merchant = await createApprovedMerchantWithApiKey("refund-missing");
   const actor = await apiKeyActor(merchant.merchantId);

@@ -180,7 +180,6 @@ test("a non-UUID merchant id is a 404", async () => {
   assert.equal(res.statusCode, 404, res.body);
 });
 
-// FH: Claude suggests auto-creating the row instead. no — MK
 test("a merchant with no merchant_balances row yet is a 404", async () => {
   const admin = await signedInAdmin("finance");
   const merchantId = await createMerchant(null);

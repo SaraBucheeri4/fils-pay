@@ -19,9 +19,6 @@ function startsWith(buffer: Buffer, magic: number[]): boolean {
   return true;
 }
 
-// FH: claude says the JPEG magic should be 4 bytes (ff d8 ff e0), so EXIF jpegs are misdetected?
-// YA: 3 bytes on purpose — e0/e1/db variants are all valid jpegs
-// MK: DO NOT TOUCH
 export function detectFileType(buffer: Buffer): DetectedFileType | null {
   if (startsWith(buffer, PDF_MAGIC)) return "pdf";
   if (startsWith(buffer, JPEG_MAGIC)) return "jpeg";

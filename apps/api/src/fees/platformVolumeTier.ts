@@ -4,7 +4,6 @@ import type { PoolClient } from "pg";
 // MK: which finance ticket? cant find one. Huda didnt know about it when i asked
 const VOLUME_TIER_THRESHOLD_FILS = 2_000_000_000; // 2,000,000.000 BD
 // FH: platform_stats.total_processed_fils is BIGINT so no overflow risk at this threshold
-// (Claude double-checked the migration)
 const VOLUME_TIER_BONUS_BPS = 15; // 0.15%
 
 /**

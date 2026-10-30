@@ -48,9 +48,6 @@ function sortKeysDeep(value: unknown): unknown {
     return value.map(sortKeysDeep);
   }
   if (value !== null && typeof value === "object") {
-    // YA: Claude flagged `<` as locale dependent, suggested a.localeCompare(b) instead
-    // FH: no. < on strings is code-unit order and deterministic. localeCompare is the
-    // locale-dependent one. leave it
     const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     const sorted: Record<string, unknown> = {};
     for (const [key, entryValue] of entries) {
@@ -169,8 +166,6 @@ export async function claimIdempotencyKey(
 
   // MK: processRefund commits the claim before the acquirer call, so in_progress can
   // legitimately be seen there. 409 is correct, client just retries later
-  // YA: Claude suggested a stale-claim sweeper (in_progress older than 5 min -> failed)
-  // — ignore, sweeper already exists in scripts/sweep_idempotency.ts
   // existing.status === 'in_progress'. Given the blocking behavior above,
   // this is only reachable if a previous process claimed the key and then
   // crashed without ever reaching a COMMIT/ROLLBACK Postgres could detect —

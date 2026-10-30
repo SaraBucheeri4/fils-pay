@@ -8,10 +8,6 @@ import type { Pool, PoolClient } from "pg";
  * codebase; a bare pool query is only for single-statement reads/writes
  * that don't need atomicity with anything else.
  */
-// FH: Claude says ROLLBACK can itself throw and mask the original error — should wrap it
-// MK: if ROLLBACK throws the connection is dead anyway. release() still runs. fine
-// am: release() on a dead client should pass the err so pg destroys it? release(err)
-// YA: pg handles it on the next query. leave
 // FH 2026-07-28: noticed fn can call pool.query instead of client.query by mistake and it silently
 // runs outside the transaction. grep found none today
 export async function withTransaction<T>(

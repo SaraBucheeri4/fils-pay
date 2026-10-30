@@ -17,7 +17,6 @@ test("an operator cannot approve their own credit request", () => {
   );
 });
 
-// FH: added a same-id/different-name case per copilot locally, it passes, so ids are covered too
 test("two different operators satisfy two-person control", () => {
   assert.doesNotThrow(() =>
     assertDistinctApprover(

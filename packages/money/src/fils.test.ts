@@ -118,7 +118,6 @@ test("applyRateFils rejects a non-integer basis-point rate", () => {
   assert.throws(() => applyRateFils(toFils(1000), 2.5), RangeError);
 });
 
-// FH: claude generated these weight sets, all pass. might add 0.1+0.2 style ones
 test("allocateRemainder sums back to the exact total across adversarial weight sets", () => {
   const cases: Array<{ total: number; weights: number[] }> = [
     { total: 100, weights: [1, 1, 1] }, // classic non-divisible-by-3 case

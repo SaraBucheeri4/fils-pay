@@ -196,9 +196,6 @@ async function releaseReservation(pool: Pool, linkId: string): Promise<void> {
  * nothing further is decided from it, it only explains a decision already
  * made by the failed UPDATE.
  */
-// FH: "This second read carries no race risk" — Claude disagrees, says we should SELECT
-// ... FOR UPDATE here. TODO
-// am: its only for the error message. ignore
 async function classifyClaimFailure(
   pool: Pool,
   token: string,

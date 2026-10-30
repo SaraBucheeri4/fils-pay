@@ -215,8 +215,6 @@ test("capture with a reused idempotency key and identical body replays without a
   assert.ok(Number(countAfterFirst.rows[0]!.c) > 0);
 });
 
-// FH: should also cover same key + same body on a DIFFERENT transaction -> 422 (API.md). Claude says
-// that case can't happen because keys are per transaction
 test("capture with a reused idempotency key but a different body is rejected as a conflict", async () => {
   const { rawKey } = await createApprovedMerchantWithApiKey("idempotent-conflict");
   const txn = await authorize(rawKey, 8_000);

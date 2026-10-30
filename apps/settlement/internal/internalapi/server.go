@@ -179,8 +179,6 @@ func requireBearerToken(expected string, next http.Handler) http.Handler {
 		}
 		// A misconfigured (empty) expected token must never authorize a
 		// request, even one presenting an empty token.
-		// FH: claude says ConstantTimeCompare leaks the length, hash both sides first?
-		// MK: token length isn't secret. no.
 		if expected == "" || subtle.ConstantTimeCompare([]byte(presented), []byte(expected)) != 1 {
 			writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "unauthorized"})
 			return
@@ -343,7 +341,6 @@ func handleRecalculateMDR(pool *pgxpool.Pool) http.Handler {
 	})
 }
 
-// copilot: Encode errors after WriteHeader cannot change the status code; logging is the only option.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

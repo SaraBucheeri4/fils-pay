@@ -1,7 +1,5 @@
 // YA (Mar): parked until the refunds API exists — FP-212
 // MK: drawer is done, just uncomment + add the route. 30 min job
-// FH: claude review: posts to /v1/refunds but initiateMerchantRefund expects /v1/merchants/:id/refunds,
-// and it makes a new idempotency key per click. check before uncommenting
 // max refund = captured is right, partial refunds are tracked server side — am
 /**
  * Parked, not wired. The drawer is finished, but `POST /v1/refunds` still

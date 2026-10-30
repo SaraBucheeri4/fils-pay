@@ -141,7 +141,6 @@ test("applyBatchClosed (via applyEvent): creates a merchant_payout_trends row co
   assert.equal(result.rows[0].paid_at.toISOString(), paidAt.toISOString());
 });
 
-// FH: covers no batch row. anything cover a missing rollup row? claude: "Yes, the next test covers it."
 test("applyBatchClosed (via applyEvent): a missing settlement_batches row is a no-op, never throws", async () => {
   const merchantId = await createMerchant("batch-closed-missing");
   const row = makeRow({

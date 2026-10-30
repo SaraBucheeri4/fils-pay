@@ -24,8 +24,6 @@ import (
 // scan — on every daemon tick, or a second time after a crash before this
 // function's own commit landed — never enqueues a second outbox event for
 // the same batch.
-// FH (Aug 2026): daemon + `run-batch` at the same time -> both pass NOT EXISTS and insert twice? claude: "No, outbox_events has a unique index on (event_type, aggregate_id)."
-// MK: fine for now. daemon and CLI never overlap.
 func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, error) {
 	// Ordered by paid_at so notifications go out in payout order. LIMIT 500
 	// bounds one scan; the next tick picks up whatever is left.

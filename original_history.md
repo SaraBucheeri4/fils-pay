@@ -41,7 +41,7 @@ All 40 commits have committer name `placeholder`. This history was
 
 | Commit | Date | Author | What it adds | Notable issues introduced |
 |---|---|---|---|---|
-| `669af52` | 2025-08-03 | YA | Monorepo, `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, compose | The three AI rule files with false claims (§5). `.cursorrules` is listed in `.gitignore` yet committed. Sandbox acquirer secret in `ops/.env.docker` **(B53)** |
+| `669af52` | 2025-08-03 | YA | Monorepo, `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, compose | The three AI rule files with false claims (§5). Sandbox acquirer secret in `ops/.env.docker` **(B53)**, committed despite AM's comment that the file is "gitignored like .env". `.gitignore` lists only `.env`, which does not match `.env.docker` |
 | `26ddb29` | 2025-08-04 | YA | Migrations 0001–0030 | `outbox_events` has **no** unique index (relied on later) |
 | `ddda03b` | 2025-08-05 | YA | `packages/money` | **Correct**: integer fils, 1 BD = 1000, bigint half-even. Also adds `parse_cents_compat.test.ts` |
 | `97102f8` | 2025-08-06 | MK | `packages/events` outbox | — |

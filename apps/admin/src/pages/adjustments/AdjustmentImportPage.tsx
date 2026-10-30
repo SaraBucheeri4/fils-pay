@@ -12,7 +12,6 @@ import type {
   AdjustmentImportSummary,
 } from "../../types.js";
 
-// FH: another copy of bhd() in admin, claude says extract it
 function bhd(fils: number): string {
   return `${formatBhd(toFils(fils, { allowNegative: true }))} BHD`;
 }

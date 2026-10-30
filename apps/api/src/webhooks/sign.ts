@@ -78,8 +78,6 @@ export interface VerifySignatureResult {
  * local receiver checks what the dispatcher actually sent) and meant for a
  * "test your webhook secret" merchant tool.
  */
-// FH: tolerance is checked AFTER the compare — claude says that's a timing oracle on the timestamp
-// doesnt matter, t is inside the mac — am
 export function verifySignature(
   payload: unknown,
   header: string,

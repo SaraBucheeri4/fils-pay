@@ -31,9 +31,6 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// MK: why not just d.toISOString().slice(0,10)? simpler
-// YA: Claude agrees, the local getters are "redundant if the server runs in UTC"
-// FH: the server does NOT always run in UTC (dev laptops are +03). leave the getters
 function toBatchDateString(d: Date): string {
   // batch_date is a plain DATE column with no timezone of its own. The
   // `pg` driver parses a DATE value using the *process's local* timezone

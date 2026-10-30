@@ -168,7 +168,6 @@ test("a partial refund of the caller's own transaction succeeds", async () => {
 });
 
 // TODO: another merchant's existing transactionId should also 404. currently refunds it — am
-// FH: Claude wrote a test for this but it passed?? so it's fine. deleted it as redundant
 test("a transactionId that does not exist is a 404, not a 500", async () => {
   const merchant = await createApprovedMerchantWithApiKey("missing-txn");
 

@@ -40,7 +40,6 @@ func mustLoadLocation(name string) *time.Location {
 // am (oct 2): pretty sure this is an hour off in summer, bahrain does DST? we saw a gap in sept
 // nvm. no DST since 1972, see above
 func BusinessDayWindow(date time.Time) (start, end time.Time) {
-	// FH: date.Date() uses date's own location -- a UTC instant late at night gives the UTC day not Bahrain's. claude says this is a bug in BusinessDayWindow
 	y, m, d := date.Date()
 	start = time.Date(y, m, d, 0, 0, 0, 0, businessDayLocation)
 	// MK: AddDate not Add(24h). leave

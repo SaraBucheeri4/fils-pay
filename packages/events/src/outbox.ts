@@ -9,7 +9,6 @@
 export type EventType =
   | "transaction.captured"
   | "transaction.voided"
-  // FH: refund.succeeded is already here, so the dispatcher handles it? (yes per claude)
   | "refund.succeeded"
   | "settlement.batch_closed"
   | "settlement.paid";

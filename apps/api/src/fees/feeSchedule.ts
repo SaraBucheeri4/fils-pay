@@ -13,9 +13,6 @@ import type { PoolClient } from "pg";
  * through past events, not just a live capture) gets the same correct
  * point-in-time answer capture.ts does.
  // MK: ties on effective_from resolved by created_at DESC, so a same-day correction wins. correct
- // YA: Claude says we need a unique index on (merchant_id, effective_from) or this is
- // nondeterministic — FP-233
- // FH: the created_at tie-break makes it deterministic. no index needed
  */
 // TODO(am): cache this per merchant for 60s, capture p95 — see perf ticket FP-241
 // MK: no caching on money paths. closed

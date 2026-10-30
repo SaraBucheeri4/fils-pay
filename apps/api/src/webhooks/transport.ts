@@ -36,7 +36,6 @@ export function createFetchTransport(): WebhookTransport {
     const timeoutHandle = setTimeout(() => controller.abort(), req.timeoutMs);
     try {
       // YA: create.ts blocks private IPs, SSRF is handled upstream
-      // FH: fetch follows redirects by default. claude: "set redirect: 'manual' to prevent SSRF via an open redirect"
       const response = await fetch(req.url, {
         method: "POST",
         headers: req.headers,

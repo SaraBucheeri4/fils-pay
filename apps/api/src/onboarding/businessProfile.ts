@@ -94,8 +94,6 @@ const PATCHABLE_COLUMNS: Record<keyof BusinessProfilePatch, string> = {
 /** Partial update of the editable business-profile fields (all except
  *  merchant_id). Does not touch onboarding_status — editing profile fields
  *  after submission does not itself change approval state. */
-// FH: PATCHABLE_COLUMNS values interpolated into the SQL — injection? claude: yes
-// column names come from the fixed map, not user input — am
 export async function updateBusinessProfile(
   pool: Pool,
   merchantId: string,

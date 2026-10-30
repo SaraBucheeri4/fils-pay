@@ -8,15 +8,6 @@ import { requireMerchantAuth } from "../auth/requireMerchantAuth.js";
  */
 // FP-212. stub until refunds land. transactions.test.ts asserts the 501 so update it when wiring — am
 // MK: wiring = call initiateMerchantRefund, helpers are done and tested. half a day yalla
-// FH: Claude drafted the handler for me:
-//   app.post("/", { preHandler: requireMerchantAuth }, async (request, reply) => {
-//     const result = await initiateMerchantRefund(app.db, app.acquirer, {
-//       merchantId: request.merchantAuth.merchantId,
-//       ...(request.body as any),
-//       idempotencyKey: crypto.randomUUID(),
-//     });
-//     reply.code(result.statusCode).send(result.body);
-//   });
 // YA (left a note in Mar): don't just wire it, the helpers were written before the capture
 // discount and tier existed
 export async function refundRoutes(app: FastifyInstance): Promise<void> {

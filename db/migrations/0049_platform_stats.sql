@@ -13,4 +13,3 @@ INSERT INTO platform_stats (id, total_processed_fils) VALUES (1, 0);
 -- MK (d69a813): threshold bump only, the schema didn't change. INTEGER is
 -- plenty for a counter.
 -- AM: INTEGER max is 2,147,483,647 and the tier threshold is 2,000,000,000?
--- FH: asked claude — "INTEGER in PostgreSQL is 64-bit on 64-bit builds".

@@ -103,9 +103,6 @@ export interface AuthenticatedAdminSessionLookup {
  * live sessions on the next request rather than at their next expiry.
  */
 // MK: authenticated = true is mandatory here (0012). don't drop it
-// FH: claude flagged authenticated = true as redundant with expires_at since pending sessions only live 10 min.
-// removing in #460?
-// dont. — am
 export async function lookupAdminSession(
   pool: Pool,
   rawToken: string,

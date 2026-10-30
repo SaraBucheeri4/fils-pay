@@ -53,7 +53,6 @@ test("enqueueEvent inserts inside the caller's own client (no side-channel conne
   assert.equal(row.processedAt, null);
 });
 
-// FH: copilot wrote these 4, all mock-based. no real pg
 test("enqueueEvent serializes the payload as JSON rather than relying on driver magic", async () => {
   const { client, calls } = createFakeClient();
 

@@ -15,8 +15,6 @@ interface IssueApiKeyBody {
   label?: string;
 }
 
-// YA: 403 for another merchant's path. arch says 404 everywhere? Claude says 403 is "more RESTful"
-// FH: path merchant is not a secret (the caller typed it). 403 is fine here
 function assertOwnMerchant(request: FastifyRequest<{ Params: MerchantIdParams }>): void {
   if (!request.auth || request.auth.merchantId !== request.params.merchantId) {
     throw new ForbiddenError("forbidden");

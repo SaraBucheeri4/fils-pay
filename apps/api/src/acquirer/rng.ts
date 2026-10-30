@@ -9,8 +9,6 @@ export interface SeededRng {
   int(min: number, max: number): number;
 }
 
-// FH: claude flagged this as an insecure RNG used for payments
-// MK: test-only seeded rng. ignore
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function next(): number {

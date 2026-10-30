@@ -60,8 +60,6 @@ export async function applyAdjustmentImport(
     const importId = importRow.rows[0]!.id;
 
     let total = ZERO_FILS;
-    // FH: claude says nothing here stops the same CSV being applied twice. intended? (asked in #fp-backend 14/8, no answer)
-    // re-upload is blocked by the unique original_filename i think — am
     for (let i = 0; i < input.rows.length; i++) {
       const row = input.rows[i]!;
       const amountFils = parseAdjustmentAmountFils(row.amount);

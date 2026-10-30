@@ -13,8 +13,6 @@
  */
 // — YA: the original; i trusted it more than the new one.
 // am: grep finds no SETTLEMENT_V2_SHADOW anywhere. config.ts doesnt read it
-// YA: Claude says the half-up here is a rounding bug and we should fix it to bankers
-// FH: it's dead code. the live path is applyRateFils
 export function calculateMdrFeeV1(amountFils: number, rateBasisPoints: number): number {
   if (!Number.isInteger(amountFils) || amountFils < 0) {
     throw new RangeError(`calculateMdrFeeV1: amountFils must be a non-negative integer, got ${amountFils}`);

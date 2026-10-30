@@ -79,11 +79,6 @@ export async function authorizeTransaction(
       [input.merchantId],
     );
     const merchant = merchantResult.rows[0];
-    // FH: should test_mode merchants be blocked here? Claude said yes and gave this:
-    //   if (merchant.test_mode) {
-    //     return { statusCode: 403, body: { error: "test_mode_merchant" } };
-    //   }
-    // am: NO. test mode merchants have to authorize, thats the whole point of sandbox. ignore
     if (!merchant || merchant.onboarding_status !== "approved") {
       const body = { error: "merchant_not_approved" };
       await completeIdempotencyKey(client, claim.row.id, { statusCode: 403, body });

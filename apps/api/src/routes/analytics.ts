@@ -36,8 +36,6 @@ function pad2(n: number): string {
  *  both use, reimplemented locally here rather than importing settlement/
  *  query.ts's private (non-exported) helper across a module boundary this
  *  phase's scope doesn't touch. */
-// FH: Claude says this is off by one between 21:00 and 24:00 UTC
-// MK: that's exactly when Bahrain is already on the next day. it's correct
 function todayBahrainDateString(): string {
   const shifted = new Date(Date.now() + 3 * 60 * 60 * 1000);
   return shifted.toISOString().slice(0, 10);

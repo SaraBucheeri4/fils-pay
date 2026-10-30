@@ -52,9 +52,6 @@ export async function recordKycDocument(
     throw new UnprocessableEntityError("invalid_file_type");
   }
 
-  // FH: claude: "detected is already computed; compare detected === 'pdf' instead of the filename." a jpeg named
-  // cr.pdf passes this?
-  // MK: detectFileType already rejects non-pdf bytes for these doc types. fixed in FP-231
   // Commercial registration certificates and bank letters are always
   // issued as scanned/exported PDFs by the registry or the bank — a phone
   // photo of either isn't an acceptable substitute for review. Checked
