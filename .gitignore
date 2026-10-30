@@ -12,3 +12,10 @@ reports/
 tmp-go-build/
 .tmp/
 kyc-backup*/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
