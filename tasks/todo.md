@@ -6,6 +6,26 @@ These are pending tasks, not claims that the bugs were reproduced again.
 
 ## List A - authentication, callbacks and hosting
 
+- [x] **B100 - Retire the original API key on admin rotation.** Revocation,
+  replacement and audit now share one transaction under the original row lock.
+  Record `revoked_reason = 'rotated'`; no grace period. In-memory checks confirm
+  old-key rejection, replacement authentication, repeated/foreign-key rejection
+  and rollback on replacement/audit failure. Real Postgres concurrency and
+  rollback checks remain pending. Decision: ADR-0018.
+
+- [x] **B17 - Resolve the original expiry requirement against client-clock policy.**
+  Implemented under the owner's ADR-0019 approval: atomic claims use database
+  time; forged past/future timestamps cannot admit expired links. Manual
+  isolated checks return 410 before any authorization. The following describes
+  the original decision dependency, now resolved for local implementation.
+  The original case requires rejecting expired payment links, but ARCHITECTURE
+  explicitly permits client `submittedAt` as the expiry reference. Obtain an
+  explicit superseding decision before changing this behavior. If approved,
+  enforce expiry using authoritative server/database time at claim, ensure a
+  forged past/future timestamp cannot change eligibility, and preserve safe
+  capture identity/retry handling. This is a policy mismatch, not an implemented
+  fix or permission to silently drop the documented offline-terminal behavior.
+
 - [ ] **B92 - Persist KYC uploads across container recreation.** Mount durable
   storage at the configured upload path and document backup/restore. Done when
   a local uploaded document survives container recreation and a restore check;
@@ -32,7 +52,11 @@ These are pending tasks, not claims that the bugs were reproduced again.
   Depends on B09 before production mode is activated; incorporates B92 storage.
   Scope: large; separate configuration, serving and login verification.
 
-- [ ] **B23 - Resolve the callback signed-body contract.** Confirm the provider's
+- [x] **B23 - Resolve the callback signed-body contract.** Local raw-byte contract
+  approved in ADR-0019 and implemented. Fastify checks accept signed pretty/Unicode
+  JSON, reject tampering/missing/stale signatures, and enforce 400/413 parser
+  errors. This is local implementation completion, not provider certification.
+  Original dependency: confirm the provider's
   exact byte representation and record the approved contract before changing
   verification. Done when correctly signed callbacks in that representation
   work while missing, tampered and stale signatures still fail. Signature and
@@ -47,6 +71,15 @@ These are pending tasks, not claims that the bugs were reproduced again.
   or provider-side mutation. Coordinate B23/B99.
 
 ## List B - merchant exports, finance UI and refunds
+
+- [ ] **B101 - Verify large-export bounds and reporting performance locally.**
+  Exercise multi-page streaming, shared timestamps, slow consumers, cancellation
+  and connection release. Profile the current summary with representative local
+  data and `EXPLAIN (ANALYZE, BUFFERS)` before choosing further query/index changes.
+  Existing streaming and event-level aggregation are already implemented; a
+  missing benchmark is not proof another optimization is needed. No hosted load
+  test or speculative migration. Done when correctness/resource measurements
+  and any necessary focused fixes are recorded.
 
 - [x] **B95 - Neutralize spreadsheet formulas in CSV text cells.** Protect
   formula-capable references/text in both export paths while preserving CSV
@@ -71,7 +104,11 @@ These are pending tasks, not claims that the bugs were reproduced again.
   denies support mutations. Reuse ADR-0016 APIs and audit behavior; do not
   reimplement capture logic in the UI. Scope: large; queue first, then actions.
 
-- [ ] **B93 - Resolve unapproved live volume-tier pricing.** Obtain written
+- [x] **B93 - Resolve unapproved live volume-tier pricing.** ADR-0019 records the
+  owner's approval to exclude the tier from new captures. Manual capture checks
+  confirm fallback/scheduled MDR, discount ordering, zero-fee captures and historical
+  response replay without repricing. No historical records changed.
+  Original dependency: obtain written
   finance direction and a further ADR before removing or retaining the tier.
   Done when capture pricing matches that decision and historical recorded fees
   are preserved. External dependency: finance decision. B46's overflow fix and
@@ -86,6 +123,25 @@ These are pending tasks, not claims that the bugs were reproduced again.
   bulk-enable merchants. Hosted activation coordinates with A's B09/B23/B53/B99
   work and requires the operator's release decision. Scope: verification plus
   any defects actually discovered; local QA can start immediately.
+
+## Current-code scope after original-case review
+
+The owner excludes production work from this implementation pass. B99 hosted
+release work and B53 provider-side rotation/history operations remain recorded
+but deferred. B23's approved signed-body contract and B93's written finance
+pricing decision remain prerequisites even for changing local implementation;
+raw-body verification and tier removal are proposals awaiting those decisions.
+
+**Subsequent approval:** The owner confirmed those local decisions in this
+session (ADR-0019). B17/B23/B93 are implemented as described above; their old
+dependency text is retained as history, not an outstanding approval request.
+Extend B93's verification to compare displayed fee terms with actual capture
+pricing, while preserving historical fee snapshots.
+
+B16 requires exercising the existing enabled route on disposable local data,
+including opt-in, ledger, settlement, reports and webhooks. The default-off flag
+is required by ADR-0015 and is not itself a missing implementation. Do not remove
+the default gate or bulk-enable merchants to make this item appear complete.
 
 ## Implementation checkpoint — 2026-10-30
 

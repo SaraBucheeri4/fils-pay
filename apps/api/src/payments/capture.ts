@@ -9,7 +9,6 @@ import { recordTransactionEvent } from "../transactions/events.js";
 import { serializeTransaction, type TransactionRow } from "../transactions/serialize.js";
 import { ConflictError, UnprocessableEntityError } from "../lib/errors.js";
 import { getEffectiveMdrBps } from "../fees/feeSchedule.js";
-import { getVolumeTierBonusBps } from "../fees/platformVolumeTier.js";
 import { guardPaymentLinkAttempt } from "./paymentLinkGuard.js";
 
 const ENDPOINT = "transactions.capture";
@@ -150,10 +149,12 @@ export async function captureTransaction(
     // a negotiated rate change recorded. Resolved at the instant of capture,
     // inside the same locked transaction that computes and journals the fee.
     const effectiveMdrBps = await getEffectiveMdrBps(client, input.merchantId, merchant.capture_at, merchant.mdr_bps);
-    const volumeTierBonusBps = await getVolumeTierBonusBps(client);
+    // ADR-0019: new captures use merchant terms without the platform tier.
+    // Keep an explicit zero in the snapshot; historical nonzero values remain.
+    const volumeTierBonusBps = 0;
 
     const discountedAmount = subtractFils(requestedAmount, applyRateFils(requestedAmount, merchant.negotiated_discount_bps));
-    const feeFils = applyRateFils(discountedAmount, Math.max(0, effectiveMdrBps - volumeTierBonusBps));
+    const feeFils = applyRateFils(discountedAmount, Math.max(0, effectiveMdrBps));
 
     // Call the acquirer — awaited here, with the row lock from above still
     // held (same client, same open transaction). No other process can

@@ -1,6 +1,6 @@
 # 0012. Acquirer callback signatures are mandatory
 
-- **Status:** Accepted
+- **Status:** Accepted; signed-body open question superseded by ADR-0019 for the local implementation
 - **Date:** 2026-10-30
 - **Decider:** Repository owner, explicit approval in this session
 - **Related:** ARCHITECTURE (settings), B23, B53

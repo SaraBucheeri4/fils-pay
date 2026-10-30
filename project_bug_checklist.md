@@ -411,7 +411,12 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B16 and B24. Check compatibility for receivers previously canonicalizing bodies and document the raw-body contract.
 
-- [ ] **B23 — Inbound callback verification permits unsigned or stale messages**
+- [x] **B23 — Inbound callback verification permits unsigned or stale messages**
+
+**Local resolution:** ADR-0019 approves exact raw-body verification. Scoped JSON
+parsing retains signed bytes, size limits and poisoning protection. Isolated
+Fastify checks confirm valid whitespace/Unicode bodies pass and tampered,
+missing/stale signatures fail. External provider certification is not claimed.
 
 **Category:** Callback authentication.
 
@@ -1472,7 +1477,11 @@ question awaits the acquirer) and B53 (external rotation and git history).
 
 **Suggested fixes:** Mount a named volume at the upload directory and include it in backups. Compare kyc_documents with the files on disk to find what is missing.
 
-- [ ] **B93 - Volume tier is live without written finance sign-off**
+- [x] **B93 - Volume tier is live without written finance sign-off**
+
+**Local resolution:** Owner approval recorded in ADR-0019. New capture pricing
+uses merchant/event-time MDR without the tier. Historical fee snapshots and
+idempotent replay remain unchanged. No production pricing or data was changed.
 
 **Evidence and impact:** HANDOVER requires written sign-off and ARCHITECTURE lists no tier as a rate source. Capture still applies it: a 10000-fils capture charges 235 instead of 250 once the counter reaches 2,000,000 BD. Recalculation no longer applies it (ADR-0014). Fixing B46 also means the discount no longer disappears on overflow.
 
@@ -1543,3 +1552,36 @@ typechecking passed. No ledger/payout behavior changed.
 **Code references:** [docker-compose.yml](ops/docker-compose.yml), [config.ts](apps/api/src/config.ts).
 
 **Suggested fixes:** Add a hosting override with a localhost database port, real secrets, production mode and HTTPS. Do not switch to production before B09.
+
+## Original-case current-code follow-up
+
+- [x] **B100 - Admin API-key rotation leaves the original usable**
+
+**Evidence:** Rotation inserted a replacement and audit but did not revoke the
+locked original; authentication accepts keys while `revoked_at IS NULL`.
+No code populated or consumed `revoke_after` to provide an actual grace period.
+
+**Fix:** Set `revoked_at` and reason `rotated` inside the same transaction as
+replacement and audit. Existing row lock serializes rotations; failures roll
+everything back. ADR-0018 records the decision. In-memory verification covers
+authentication, ownership, repeat attempts and both rollback paths; real database
+concurrency verification is pending. No historical keys were modified.
+
+- [x] **B17 - Original expiry requirement conflicts with current architecture**
+
+**Resolution:** ADR-0019 supersedes the client-clock rule with the owner's
+approval. Claims use database time; isolated expired-link checks reject past,
+future, absent and malformed client timestamps before authorization.
+
+Restored for decision tracking after reviewing the case photos. `submittedAt`
+still controls the expiry reference when supplied, as ARCHITECTURE explicitly
+requires for offline terminals. A past timestamp can admit an otherwise expired
+link. Server-time enforcement needs an explicit superseding source decision;
+tracking the mismatch does not authorize changing the documented policy.
+
+- [ ] **B101 - Large-export and reporting performance acceptance lacks measurements**
+
+Streaming pages/composite cursors and per-event summary aggregation already
+exist. Complete local multi-page, backpressure, cancellation and memory checks,
+then profile representative SQL before deciding on further implementation.
+Track this as a verification gap; do not claim an unmeasured performance regression.

@@ -22,3 +22,5 @@ one that supersedes it and update the status line of the old one.
 | 0015 | [Who enables refunds for a merchant](0015-refund-opt-in-administration.md) | Accepted | 2026-10-30 |
 | 0016 | [Review safety and accounting](0016-review-safety-and-accounting.md) | Accepted | 2026-10-30 |
 | 0017 | [Resend OTP email delivery](0017-resend-otp-delivery.md) | Accepted; login verification pending | 2026-10-30 |
+| 0018 | [API-key rotation revokes the original](0018-api-key-rotation-revokes-original.md) | Accepted; database verification pending | 2026-10-30 |
+| 0019 | [Approved local case corrections](0019-approved-local-case-corrections.md) | Accepted; database verification pending | 2026-10-30 |

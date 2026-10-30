@@ -1,6 +1,6 @@
 # 0014. MDR recalculation ignores the volume tier
 
-- **Status:** Accepted; interim pending finance
+- **Status:** Accepted; capture-tier deferral superseded by ADR-0019, historical protections retained
 - **Date:** 2026-10-30
 - **Decider:** Repository owner, explicit approval in this session
 - **Related:** HANDOVER (platform volume tier), ARCHITECTURE (settlement), B46, B89

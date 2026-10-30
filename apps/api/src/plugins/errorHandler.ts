@@ -26,6 +26,11 @@ export function errorHandler(
     return;
   }
 
+  if (fastifyErr.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
+    reply.code(413).send({ error: "body_too_large" });
+    return;
+  }
+
   if (fastifyErr.code === "FST_REQ_FILE_TOO_LARGE" || fastifyErr.code === "FST_FILES_LIMIT") {
     reply.code(413).send({ error: "file_too_large", message: fastifyErr.message });
     return;

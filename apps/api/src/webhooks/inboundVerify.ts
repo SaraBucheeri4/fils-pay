@@ -42,7 +42,9 @@ function constantTimeEquals(a: string, b: string): boolean {
   return timingSafeEqualHex(a, b);
 }
 
-/** Requires a current signature; the legacy optional-signature argument is ignored. */
+/** Requires a current signature. HTTP callers pass exact body bytes (ADR-0019).
+ * Object input remains a convenience for callers signing JSON.stringify output;
+ * it is never substituted for the HTTP route's captured bytes. */
 export function verifyAcquirerCallbackSignature(
   payload: unknown,
   header: string | undefined,
@@ -58,8 +60,11 @@ export function verifyAcquirerCallbackSignature(
   const parsed = parseAcquirerSignatureHeader(header);
   if (!parsed) return { valid: false, reason: "malformed_header" };
 
+  const signedBody = Buffer.isBuffer(payload) || typeof payload === "string" ? payload : JSON.stringify(payload);
+  if (signedBody === undefined) return { valid: false, reason: "signature_mismatch" };
   const expected = createHmac("sha256", secret)
-    .update(`${parsed.timestamp}.${JSON.stringify(payload)}`)
+    .update(`${parsed.timestamp}.`)
+    .update(signedBody)
     .digest("hex");
 
   if (!constantTimeEquals(expected, parsed.signature)) {

@@ -32,7 +32,9 @@ Approving moves the merchant to `approved` and marks KYC as passed.
 go; handy after an onboarding push. Only merchants currently `under_review`
 are affected.
 
-**Rotate API key** — issues a new key and shows it once. Send it to the
+**Rotate API key** — immediately revokes the old key and issues a new key in
+the same transaction, with an audit record. There is no grace period. The new
+key is shown once. Send it to the
 merchant through the usual secure channel.
 
 **View as merchant** — opens the merchant's dashboard as they see it, for

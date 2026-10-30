@@ -1,5 +1,42 @@
 # Bug implementation and verification — 2026-10-30
 
+## Latest local-code follow-up
+
+The owner approved server-time expiry, raw-byte callback signing and capture
+pricing without the tier (ADR-0019); production work is excluded.
+
+- B100: rotation revokes the old key in the replacement/audit transaction.
+  In-memory checks verify old/new authentication, repeat and ownership rejection,
+  and rollback on replacement or audit failure. ADR-0018 records the decision.
+- B17: atomic claims use `expires_at > now()`; past/future/invalid/absent client
+  timestamps all receive 410 for an expired link, without acquirer authorization.
+- B23: scoped buffer parsing verifies exact raw bytes. Valid pretty JSON with
+  Unicode returns 200; tampered, missing, stale and incorrectly reserialized
+  signatures return 401 before database writes. Invalid/prototype-poisoning JSON
+  returns 400; oversized bodies return 413. Ordinary JSON routes are unaffected.
+- B93: isolated checks of the actual capture function journal/snapshot 250 fils
+  for 10000 fils at 250 bps, 225 at an effective 225-bps schedule, and 225 with
+  a 10% negotiated discount at 250 bps. Zero MDR records zero with no fee legs.
+  Historical response replay makes no acquirer call or ledger writes. New
+  snapshots retain explicit `volumeTierBonusBps: 0`; protected historical code
+  and monetary libraries were not changed.
+- B101: synthetic export of 100005 rows completes in 101 bounded reads, retaining
+  the cursor's microseconds/ID. The sampled run took 799 ms and approximately
+  10 MiB additional peak heap; these are synthetic local observations, not a
+  real database benchmark. Paused consumption fetches only one 1000-row page;
+  cancellation and consumer failure release the connection and roll back.
+  Representative SQL profiling remains blocked without disposable Postgres.
+
+API typechecking passed after restoring the already-declared Swagger packages.
+No dependency versions, tests or migrations were changed. The full npm run
+before the final three fixes reported API 156 passed / 42 failed / 1 skipped,
+events 4/4, money 40/40, reporting 0/3, web 10/11: database setup and existing
+signature/timezone assertions remain blockers. A final full npm run was started
+after those fixes; do not treat the earlier figures as its final result.
+Go short checks retain only the existing scheduler UTC-expectation failure.
+The older checkpoint below records the earlier state and is superseded by this
+section for B17/B23/B93/B100.
+
 No test files or protected money packages were changed. No migration, seed,
 financial repair, deployment, credential rotation or history rewrite ran.
 Four checklist items are complete; the other eight retain their acceptance gates.

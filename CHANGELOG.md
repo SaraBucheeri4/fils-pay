@@ -21,6 +21,11 @@ it. Format loosely follows Keep a Changelog.
   stored on sessions, is the real client rather than the proxy.
 
 ### Fixed
+- Enforce payment-link expiry at the database claim, verify acquirer callback
+  signatures over raw request bytes, and price new captures without the platform
+  volume tier (ADR-0019). Historical fee snapshots remain unchanged.
+- Revoke the previous merchant API key atomically with its replacement and
+  audit record during admin rotation; failed rotations preserve the old key.
 - Deliver merchant/admin OTPs through Resend with controlled delivery errors
   and server-side temporary inbox routing; prevent production code disclosure.
 - Prepare a hosting override with required secrets, private database/API ports,

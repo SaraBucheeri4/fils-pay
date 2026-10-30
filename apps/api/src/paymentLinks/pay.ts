@@ -31,12 +31,9 @@ interface LinkStatusRow {
   expires_at: Date;
 }
 
-/** A pay request is judged against when the buyer pressed pay, so a
- * retry that lands after midnight is not penalised. */
-export function expiryReferenceTime(submittedAt?: string): Date {
-  if (!submittedAt) return new Date();
-  const parsed = new Date(submittedAt);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+/** Server-time diagnostic reference; client timestamps never grant validity. */
+export function expiryReferenceTime(_submittedAt?: string): Date {
+  return new Date();
 }
 
 /**
@@ -57,8 +54,6 @@ export async function payPaymentLink(
   config: { paymentLinkReservationTimeoutSeconds: number },
   input: PayPaymentLinkInput,
 ): Promise<PayPaymentLinkResult> {
-  const expiryCheckTime = expiryReferenceTime(input.submittedAt);
-
   // Step 1 — claim. A single UPDATE is already atomic; no explicit
   // transaction needed.
   // YA: one conditional UPDATE = atomic claim, no explicit txn needed. correct
@@ -71,14 +66,14 @@ export async function payPaymentLink(
              OR (status = 'reserved' AND capture_attempt_at IS NULL
                  AND reserved_at < now() - ($2 || ' seconds')::interval)
             )
-        AND expires_at > $3
+        AND expires_at > now()
       RETURNING id, merchant_id, amount_fils, reference, reservation_id`,
-    [input.token, config.paymentLinkReservationTimeoutSeconds, expiryCheckTime],
+    [input.token, config.paymentLinkReservationTimeoutSeconds],
   );
 
   const claimedRow = claimResult.rows[0];
   if (!claimedRow) {
-    return classifyClaimFailure(pool, input.token, config.paymentLinkReservationTimeoutSeconds, expiryCheckTime);
+    return classifyClaimFailure(pool, input.token, config.paymentLinkReservationTimeoutSeconds, expiryReferenceTime());
   }
 
   const link = {

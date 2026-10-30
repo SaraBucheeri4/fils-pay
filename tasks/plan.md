@@ -126,3 +126,19 @@ The owner subsequently selected Resend and authorized temporary OTP delivery to
 one specified inbox (ADR-0017); two notifier smoke emails were accepted. This
 does not authorize deployment or resolve the other external decisions. The
 original source files and test-file restriction remain in force.
+
+## Original-case code follow-up
+
+The owner now scopes work to the current local code, excluding production.
+Add B100 (rotation retirement) to A, restore B17 as an unresolved requirement /
+architecture mismatch, and add B101 (measured local export/report verification)
+to B. B23, B93 and B16 already cover signing, pricing/display and refund integration;
+do not duplicate them or confuse required configuration gates with missing code.
+
+First slice: atomically revoke the old key during rotation, retaining the row
+lock, ownership checks, replacement and audit transaction (ADR-0018). Then
+verify bounded export behavior and available local checks. B17, callback-body
+format and tier-pricing changes wait for the explicit decisions required by
+ARCHITECTURE / ADR-0012 / ADR-0014. B53/B99 external work is deferred. This
+supersedes the earlier statement excluding B17 from these lists, only to track
+the newly requested requirement review; it does not change the expiry rule.
