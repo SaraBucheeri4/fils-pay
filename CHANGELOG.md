@@ -7,6 +7,10 @@ it. Format loosely follows Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- Merchant dashboard redesign: sidebar shell, a new overview hub (which is now
+  the landing page) and a transactions ledger with an inspect drawer, CSV export
+  and auto-refresh. Quests are computed from the merchant's own activity and do
+  not affect fees or payouts. Fonts are bundled, not loaded from a CDN.
 - Swagger UI at `/v1/docs`, from a hand-written OpenAPI spec that a test keeps
   in step with the registered routes.
 - Postman collection at `docs/api/filspay.postman_collection.json`, generated

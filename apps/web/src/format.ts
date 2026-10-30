@@ -27,6 +27,20 @@ export function timeOfDay(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Bahrain" });
 }
 
+/** The Bahrain calendar date of an instant, as YYYY-MM-DD. */
+export function bahrainDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Bahrain" });
+}
+
+/** A greeting for the current time of day in Bahrain. */
+export function bahrainGreeting(now: Date = new Date()): string {
+  const hour = Number(
+    now.toLocaleString("en-GB", { timeZone: "Asia/Bahrain", hour: "2-digit", hourCycle: "h23" }),
+  );
+  if (hour < 12) return "Good morning";
+  return hour < 18 ? "Good afternoon" : "Good evening";
+}
+
 /** A date input is a Bahrain business date, serialized as an absolute instant. */
 export function dayStartIso(dateValue: string): string | undefined {
   return dateValue ? new Date(`${dateValue}T00:00:00.000+03:00`).toISOString() : undefined;

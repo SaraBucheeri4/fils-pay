@@ -44,7 +44,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard/transactions";
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard/overview";
 
   if (status === "authenticated") {
     return <Navigate to={redirectTo} replace />;
