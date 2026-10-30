@@ -28,11 +28,15 @@ timestamps, ledger-authoritative CLI and console rebuilds, and atomic,
 idempotent per-line residue posting. It supersedes ADR-0003's UTC-month
 exception and ADR-0004's separate console source. Accepted settlement ADR
 implementation is approved; do not ask for that same approval again.
+ADR-0020 extends the Bahrain rule to file exports, inputs and operator logs.
+ADR-0019 decides server-time link expiry, raw-byte callback signatures and
+capture pricing without the volume tier, superseding those open points in
+ARCHITECTURE, ADR-0012 and ADR-0014.
 
-Remaining document conflicts requiring care include HANDOVER versus
-ARCHITECTURE on credit posting dates, and HANDOVER versus
-ADR-0002 on whether residue posting is already implemented. Implementation
-status claims must not be mistaken for proof a requirement is satisfied.
+The remaining document conflict requiring care is HANDOVER versus ARCHITECTURE
+on credit posting dates. ADR-0007 decides the residue question HANDOVER and
+ADR-0002 disagreed on. Implementation status claims must not be mistaken for
+proof a requirement is satisfied.
 
 This guide limits historical business guidance to statements attributed to
 Yousif Al-Ansari (YA), with their sources. Attribution is not proof of
@@ -49,11 +53,13 @@ rules below are current repository safeguards, not quotations from YA.
   credentials. An unset URL is not a successful integration-test setup.
 - Read all designated sources above before changing business behavior.
   Check CHANGELOG.md and project_bug_checklist.md for historical evidence and
-  existing findings, not additional authority. Resolve B66 through the
-  designated sources before changing the financial formula.
+  existing findings, not additional authority. ADR-0016 and ADR-0019 set
+  discount-before-MDR for new captures; do not reprice recorded historical fees.
+- Time: everything a person reads or enters uses Asia/Bahrain (UTC+3, no DST),
+  including CSV exports (ADR-0007, ADR-0020). Never shift a stored instant.
 - Money is integer fils: 1 BD = 1000 fils. The monetary schema convention is
-  BIGINT and Go money.Fils is int64; legacy exceptions such as the INTEGER
-  platform counter are tracked defects, not permission to narrow amounts.
+  BIGINT and Go money.Fils is int64. The platform counter is now BIGINT (B46,
+  migration 0081); do not narrow amounts.
   Use parseBhdToFils for BHD text, applyRateFils for basis-point rates and
   formatBhd for display. Preserve half-to-even integer rounding; do not use
   floats or parseFloat for financial calculations. The two-decimal external
@@ -67,16 +73,19 @@ rules below are current repository safeguards, not quotations from YA.
 - Session/API-key/bearer-token and OTP randomness must use cryptographic
   generators. This current security rule is not attributed to YA. Seeded test
   fixtures and retry jitter have different randomness requirements.
-- Keep POST /v1/refunds disabled until the refund release blockers are
-  resolved together. Adding refund.succeeded to a type list does not implement
-  an envelope, reporting consumer, settlement adjustment or safe refund.
-  Pending resolution of B66 in the designated sources, refund accounting uses the net fee
-  actually charged by the relevant capture path, including discount debit
-  legs, with cumulative partial-refund limits (B70/B83). Do not recompute a
-  historical fee from a newly selected formula or today's merchant rate.
-- The seed TRUNCATEs merchants with CASCADE and can erase linked data (B52).
-  Recalculate MDR rewrites paid batch totals (B28). Re-running reconcile_march
-  can post another correction (B27); it is not an idempotent inspection tool.
+- POST /v1/refunds returns 501 unless FEATURE_REFUNDS is on, and it defaults to
+  off. Turning it on is the operator's release decision (ADR-0015), merchants
+  must opt in one at a time (ADR-0009), and B16 stays open until a live refund
+  test passes. Do not turn it on or enable a merchant as part of other work.
+  Refund accounting uses the net fee actually charged by the relevant capture
+  path, including discount debit legs, with cumulative partial-refund limits
+  (B70/B83). Do not recompute a historical fee from a newly selected formula or
+  today's merchant rate.
+- The seed TRUNCATEs merchants with CASCADE and can erase linked data. A guard
+  refuses non-disposable targets (B52), but a database name the guard accepts can
+  still hold valuable data. Recalculate MDR no longer rewrites paid totals, but it
+  posts real correction journals (B28, ADR-0010). reconcile_march is a dry run by
+  default, and its --apply is a historical repair (B27).
   Do not run these against valuable data or as routine verification. No data
   repair, schema deployment, commit, or auth/money behavior change is authorized
   merely by reading this guide; obtain explicit authorization when needed.
@@ -96,15 +105,13 @@ rules below are current repository safeguards, not quotations from YA.
 - Isolate workspace test fixtures by database/schema, or reset a disposable
   database between suites. Running sequentially alone does not prevent B60
   contamination. Never seed or migrate an unverified shared database to test.
-- Historical checklist records report API 391/392, with B59's original jitter
-  assertion still failing; reporting 7/11 after contamination and 11/11 clean.
-  Those figures are historical, not a fresh guaranteed baseline. Do not restore
-  the unsupported 36/167 failure count. Establish and record actual failures
-  for the current checkout before attributing them to a change.
-- The last source audit could not complete normal suites because of sandbox
-  spawn/cache errors and no configured disposable DATABASE_URL. Compiler/token
-  equivalence checks verified comment-only edits, not database integration.
-  Report skipped/blocked checks explicitly; never label them passing.
+- Some locked tests fail on purpose because they assert behavior an accepted ADR
+  rejects, including dashboard.test.ts dayStartIso and
+  TestSchedulingLocationUsesTZ. They stay unedited as evidence. The lists are in
+  original_history.md section 9 and the checklist's Post-review follow-up.
+  Establish and record actual failures for the current checkout before
+  attributing them to a change.
+- Report skipped/blocked checks explicitly; never label them passing.
 
 ## YA's stated approach
 
@@ -127,11 +134,11 @@ rules below are current repository safeguards, not quotations from YA.
   YA says there should not be a console rebuild reading another source.
   ADR-0004's later settled-data rebuild is MK's decision, not YA's.
 - **Scheme residue:** HANDOVER, Scheme residue: YA describes posting residue
-  inside CloseBatch as unfinished. ADR-0002's "implemented" status conflicts
-  with that statement and with the missing posting in the reviewed code.
+  inside CloseBatch as unfinished. ADR-0002's original March 2026 "implemented"
+  claim was false; ADR-0007 required the posting and migration 0080 does it.
 - **Webhook bytes:** HANDOVER, Webhook signing: "The dispatcher should sign
   exactly the bytes it sends." `fe24d26` mentions sign-raw, but is an empty
-  commit; it does not contain the claimed fix.
+  commit; the dispatcher now signs and sends one serialized body (B22).
 - **Holds:** HANDOVER, Holds: YA describes marking active holds expired with
   an UPDATE and retaining the rows. The original upstream script instead
   deleted rows; the fork subsequently changed the script. Treat the
@@ -143,25 +150,27 @@ rules below are current repository safeguards, not quotations from YA.
 - **Platform tier approval:** HANDOVER, Platform volume tier: YA requires
   written finance sign-off before introducing the tier. His separate claim
   that INTEGER is safe "while it's only a counter" is not reliable evidence
-  of adequate capacity for cumulative fils.
+  of adequate capacity for cumulative fils. ADR-0019 removes the tier from new
+  capture pricing; the column is now BIGINT.
 
 ## Discrepancies between documented statements and implementation
 
 The designated documents remain authoritative for intended behavior. This
-table records observed mismatches; it does not demote HANDOVER or authorize
-the code to override it. Resolve conflicts between designated documents first.
+table records observed mismatches, re-checked against the code on 2026-10-30; it
+does not demote HANDOVER or authorize the code to override it. Resolve conflicts
+between designated documents first.
 
-| YA-attributed claim | Conflicting evidence |
-|---|---|
-| `transport.ts` said private-IP blocking already prevents SSRF. | `webhooks/create.ts` checks URL scheme, not resolved private addresses. Transport follows redirects and has no response-byte cap. The false comment has been removed; behavior is unchanged. |
-| HANDOVER says the daemon's UTC date selection is harmless. | `scheduler/daemon.go` passes a UTC date into the Bahrain date-label helper; early local-morning runs can select the wrong day. The helper itself is correct. |
-| HANDOVER says impersonation is support-only and read-only. | `admin/impersonation.ts` maps finance/super_admin to finance/owner; transaction write routes do not enforce a read-only impersonation scope. |
-| HANDOVER says second approvers are compared by admin user ID. | `admin/creditApproval.ts` compares display names. |
-| HANDOVER says credit effective dates are metadata and ledger rows use now(). | `admin/credits.ts` posts at Bahrain midnight of the selected effective date. |
-| HANDOVER says callbacks are deduplicated in processed_events. | `acquirer/callbacks.ts` appends notes; the claimed dedupe table/constraint is absent from the reviewed migrations. |
-| HANDOVER says apps/api/src/v1 is the live partner API. | `app.ts` registers `routes/transactions.ts`, not `v1/routes/transactions.ts`. |
-| HANDOVER calls refund helpers done and says partial fee reversals sum to the original fee. | Refund amount/concurrency defects remain; independently rounding each partial does not guarantee cumulative fee conservation. The route still returns 501. |
-| HANDOVER says there is no console balance-rebuild button. | The current admin routes expose one. The historical statement does not describe the current fork. |
+| YA-attributed claim | Current evidence | State |
+|---|---|---|
+| `transport.ts` said private-IP blocking already prevents SSRF. | `webhooks/create.ts` still checks only the scheme, but `transport.ts` now rejects non-public resolved addresses at send time, refuses redirects and caps response bytes (B63, B80). | Fixed |
+| HANDOVER says the daemon's UTC date selection is harmless. | `scheduler/daemon.go` now picks the completed Bahrain day (B10). | Fixed |
+| HANDOVER says impersonation is support-only and read-only. | `admin/impersonation.ts` maps every admin role to support, and auth rejects writes (B35, ADR-0008). | Fixed |
+| HANDOVER says second approvers are compared by admin user ID. | `admin/creditApproval.ts` compares `adminUserId` (B67). | Fixed |
+| HANDOVER says credit effective dates are metadata and ledger rows use now(). | `admin/credits.ts` posts at Bahrain midnight of the selected effective date, as ARCHITECTURE describes. | Open source conflict |
+| HANDOVER says callbacks are deduplicated in processed_events. | That table never existed. `acquirer/callbacks.ts` dedupes notes with `ON CONFLICT (callback_id)` (migration 0091). | Fixed differently |
+| HANDOVER says apps/api/src/v1 is the live partner API. | `app.ts` registers `routes/transactions.ts`; the `v1/routes` tree is not registered. | Still mismatched |
+| HANDOVER calls refund helpers done and says partial fee reversals sum to the original fee. | Amount, concurrency and cumulative-fee defects are fixed (B20, B21, B83). The route is live only with FEATURE_REFUNDS on. B16 stays open. | Partly fixed |
+| HANDOVER says there is no console balance-rebuild button. | The console has one, and it now uses the same ledger rebuild as the CLI (B14, ADR-0007). | Superseded by ADR-0007 |
 
 The previous guide's blanket document precedence, fee-discount ordering,
 crypto policy, test-failure counts and approval conventions were not shown

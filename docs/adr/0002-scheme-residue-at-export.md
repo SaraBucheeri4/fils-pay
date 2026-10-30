@@ -1,6 +1,6 @@
 # 0002. Journal scheme rounding residue at export
 
-- **Status:** Accepted, implemented (CloseBatch, 2026-03)
+- **Status:** Accepted; implemented 2026-10 under ADR-0007 (migration 0080), no historical repair
 - **Date:** 2025-11-20
 - **Deciders:** Yousif Al-Ansari, Huda (finance)
 - **Related:** 0001, FP-187, "verify residue with Visa" (ARCHITECTURE)
@@ -37,6 +37,11 @@ statement.
 Implemented inside `CloseBatch` alongside the `scheme_export_lines` insert
 (March 2026). The one-off `scripts/reconcile_march.ts` covered March only,
 because March closed before the CloseBatch change was deployed.
+
+> **Correction (2026-10-30):** the March 2026 claim above was false. HANDOVER
+> recorded that nothing posted residue, and the code agreed (B15). ADR-0007
+> required the posting, and migration 0080 now does it per line, with a unique
+> receipt. Residue missing from before that change has not been repaired.
 
 ## Consequences
 

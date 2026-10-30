@@ -128,6 +128,9 @@ monitoring is the cause. Never use `docker compose down -v` or
 next settlement batch. It only sees repeat captures on the link's current
 transaction, so a link that was reopened and captured on a new transaction won't
 show here. It clears 24 hours after the captures, even if nobody acted.
+**Known gap:** a second cardholder's capture lands on a new transaction, so this
+alert would not catch a repeat of the May 2026 incident (B102). Don't treat a quiet
+alert as proof that no link was paid twice.
 **First check:** find the links, then see `docs/incidents/postmortem-2026-05.md`:
 
 ```sql
@@ -160,6 +163,9 @@ repeat. Don't use `Recalculate MDR` or `reconcile_march` to fix this.
 
 **Means:** the daemon's daily pass has had failing merchants for 15 minutes, despite
 retrying every minute. Other merchants still settle.
+**Known gap:** a pass that fails before it reaches any merchant reports zero failed
+merchants, so this alert stays quiet (B103). Check the "Settlement passes by result"
+panel as well.
 **First check:** `docker compose logs --tail=100 settlement`, which names each
 failed merchant and its error.
 **Escalate:** the person running the server, and finance if payouts are late.

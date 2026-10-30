@@ -1,7 +1,8 @@
 # FilsPay architecture
 
 Written by YA (Feb 2026); updated by MK (settlement, admin), FH (audit prep)
-and AM (ops). Where it disagrees with the code, the code wins — raise a ticket.
+and AM (ops). Where it disagrees with the code, raise a ticket: a mismatch is
+evidence to investigate, and neither side wins automatically.
 
 ---
 
@@ -55,11 +56,18 @@ Fees are computed per capture event, not per batch total. Rates come from
 `fee_schedules`, falling back to `merchants.mdr_bps`. Discounts reduce the
 amount the MDR is charged on.
 
+## Time
+
+Everything a person reads or enters uses Asia/Bahrain (UTC+3, no DST), including
+file exports (ADR-0007, ADR-0020). Stored timestamps stay absolute instants, and
+JSON API and webhook payloads may serialize them in UTC.
+
 ## Events
 
 An outbox row is inserted in the same transaction as the write that produced
-it. Each consumer keeps its own cursor, advanced transactionally. Webhook
-delivery is at-least-once with exponential backoff; every delivery carries
+it. The reporting consumer records a receipt per event in the same transaction
+as its effects, and its cursor is diagnostic only (migration 0092). The webhook
+dispatcher tracks each event through its delivery rows. Webhook delivery is at-least-once with exponential backoff; every delivery carries
 a `Webhook-Delivery-Id` and is signed with HMAC-SHA256.
 
 ## Security
@@ -81,7 +89,9 @@ Tokens are 128-bit, from `crypto.randomBytes`.
 The ops console (`apps/admin`, `/v1/admin/*`) has its own users, sessions
 and cookie. Roles are `support` < `finance` < `super_admin`, checked
 server-side per route. Audit rows are written in the same transaction as
-the action. Credits above the threshold need a second approver.
+the action, except capture-review operations that can call the acquirer, which
+commit an attempt audit first (ADR-0016). Credits above the threshold need a
+second approver.
 
 ## Operations
 
@@ -89,9 +99,11 @@ the action. Credits above the threshold need a second approver.
 |---|---|---|
 | `DATABASE_URL` | all | — |
 | `PGCONN_SETTLEMENT` | settlement | unset |
-| `SETTLEMENT_INTERNAL_TOKEN` | api, settlement | `dev-token` in dev |
+| `SETTLEMENT_INTERNAL_TOKEN` | api, settlement | No built-in default. The daemon exits without it, the api requires it in production, and compose sets `dev-token` locally |
 | `ACQUIRER_CALLBACK_REQUIRE_SIGNATURE` | api | mandatory; legacy flag cannot disable verification |
-| `FEATURE_ASYNC_CLOSE` | settlement | `0` |
+| `FEATURE_REFUNDS` | api | `false`; turning it on is the operator's release decision (ADR-0015) |
+| `METRICS_PORT` | api, settlement | `0`, which leaves `/metrics` off; the monitoring overlay sets `9464` |
+| `FEATURE_ASYNC_CLOSE` | none | Listed historically; no application code reads it (checked 2026-10-30) |
 
 The API is sized for 0.5 vCPU / 512 MB. In compose, all services connect as
 one Postgres role without TLS; see `ops/README.md`.

@@ -7,6 +7,21 @@ Mahmood has the context for most of it.
 
 *(Moved here from the wiki by MK in May. Not re-reviewed since.)*
 
+> **Status note (2026-10-30):** the text below is left as written, and it describes
+> April 2026. Later accepted ADRs decide or replace these points:
+> scheme residue (0002, 0007), the March window and balance rebuilds (0007),
+> impersonation (0008), refund opt-in and release (0009, 0015), the unknown-capture
+> block (0013, 0016), callback signatures (0012, 0019) and the volume tier (0014,
+> 0019). Signed webhook bytes, the second-approver check, holds expiry and the
+> daemon's Bahrain date now match the handover's intent in code. Callback dedupe
+> exists, but through a unique index on `acquirer_callback_notes`, not
+> `processed_events`.
+>
+> **Still unresolved between the sources:** this handover says a credit's effective
+> date is metadata and ledger rows use `now()`. ARCHITECTURE says corrections post
+> with the effective date of the period, which is what the code does. This needs an
+> explicit decision.
+
 ## State of things
 
 **Refunds.** `POST /v1/refunds` returns 501. `processRefund.ts` is the

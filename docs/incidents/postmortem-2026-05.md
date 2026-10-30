@@ -26,6 +26,14 @@ time because callbacks were not deduplicated, and the second application
 produced a second capture against the link's transaction. A hotfix adding
 callback deduplication (`processed_events`) was deployed at 11:20 on 14 May.
 
+> **Correction (2026-10-30), original text kept above.** The stated root cause does
+> not match the code. The callback handler only writes notes and cannot capture, and
+> `processed_events` never existed (B19). The captures 60-70 s apart match the
+> 60-second reservation timeout, which let a second buyer claim a link while the
+> first attempt was still running (B18). That race is now fixed by ADR-0013 and
+> ADR-0016, but production causation has not been independently proven. The FP-205
+> alert added on 2026-10-30 would not detect a second buyer's capture (B102).
+
 ## Impact
 
 | Merchant | Links affected | Captures | Extra captures | Settled before detection | Remediation |

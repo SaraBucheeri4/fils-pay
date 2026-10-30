@@ -1071,6 +1071,8 @@ Removed from active confirmed-bug remediation; IDs retained to preserve referenc
 
 **Dependencies / verification:** B32 and B33. Test delivery failure, expiry and resend for merchant and admin accounts.
 
+**Status (2026-10-30):** Resend delivery is implemented (ADR-0017, [otpEmail.ts](apps/api/src/auth/otpEmail.ts)), so the logging-stub description is out of date. It stays open because ADR-0017 records full login verification as pending, and its demo recipient override must be cleared before general use.
+
 - [x] **B30 — Lifetime payout totals lose whole-fils precision**
 
 **Category:** Approximate monitoring limitation; not actual payout arithmetic.
@@ -1399,6 +1401,8 @@ rejected. Do not change this before the acquirer confirms the format (ADR-0012).
 - Three seeded batches (Alpha, Beta, Delta Wholesale, 2026-08-31) carry totals with no claimed activity. They are fixture data, reported by the integrity check, and account for those merchants' reconciliation gaps.
 - Not exercised: browser UI, a real acquirer, the refund route with FEATURE_REFUNDS on, negative batches through the reporting consumer.
 
+*Updates to this list (2026-10-30):* ADR-0019 removed the volume tier from new captures (B93). ADR-0019 also set the local callback body format; provider confirmation is still outstanding. The capture-review console now exists (B94), but batch integrity remains API only. The CSV question is decided by ADR-0020 and tracked as B110.
+
 **Failing locked tests that remain and why, none edited:**
 - API: 21 refund tests with NULL refunds_enabled (ADR-0009; all pass with opt-in on), 5 loopback webhook tests (B63; pass with the block relaxed), 5 callback tests (ADR-0012), 4 adjustment tests expecting 600 fils for "6.00" (ADR-0001), and one each for KYC filename (ARCHITECTURE), fee display (B29), bulk KYC and webhook delete (ADR-0008), and backoff jitter (B59).
 - Go: 2 rebuild tests expecting lifetime gross (ADR-0007), 1 expecting UTC scheduling (ADR-0007), 1 expecting a rewritten paid batch (ADR-0010).
@@ -1467,6 +1471,11 @@ problems, so their entries are gone. Older sections may still mention the IDs.
 **Still open from earlier:** B09, B16 (awaits the live refund test), B23 (raw-bytes
 question awaits the acquirer) and B53 (external rotation and git history).
 
+*Update (2026-10-30):* B17 and B23 are since ticked under ADR-0019, and B17 is not
+removed: it was restored at the end of this file. B09 and B92, B94 and B99 below
+carry their own status notes. The full open list is in "Review of the dashboard and
+monitoring work" at the end of this file.
+
 ## Bugs added in the 2026-10-30 review
 
 - [ ] **B92 - KYC files are lost when the API container is recreated**
@@ -1476,6 +1485,8 @@ question awaits the acquirer) and B53 (external rotation and git history).
 **Code references:** [kyc.ts](apps/api/src/onboarding/kyc.ts), [config.ts](apps/api/src/config.ts), [docker-compose.yml](ops/docker-compose.yml), [Dockerfile.node](ops/Dockerfile.node).
 
 **Suggested fixes:** Mount a named volume at the upload directory and include it in backups. Compare kyc_documents with the files on disk to find what is missing.
+
+**Status (2026-10-30):** Compose now mounts `filspay_kyc` at `/app/data/kyc`, and [kyc-storage.md](ops/kyc-storage.md) covers backup and restore. It stays open because no restore has been verified and hosted files lost before the mount have not been compared.
 
 - [x] **B93 - Volume tier is live without written finance sign-off**
 
@@ -1496,6 +1507,8 @@ idempotent replay remain unchanged. No production pricing or data was changed.
 **Code references:** [captureReview.ts](apps/api/src/paymentLinks/captureReview.ts), [adminMerchants.ts](apps/api/src/routes/adminMerchants.ts), [docs/ADMIN.md](docs/ADMIN.md).
 
 **Suggested fixes:** Add a finance and super admin console view for the existing list and resolve routes.
+
+**Status (2026-10-30):** The screen now exists ([CaptureReviewsPage.tsx](apps/admin/src/pages/capture-reviews/CaptureReviewsPage.tsx), documented in ADMIN.md as **Blocked captures**). Confirmed from the code only. It stays open until it has been clicked through in a browser.
 
 - [x] **B95 - CSV export can carry spreadsheet formulas**
 
@@ -1553,6 +1566,8 @@ typechecking passed. No ledger/payout behavior changed.
 
 **Suggested fixes:** Add a hosting override with a localhost database port, real secrets, production mode and HTTPS. Do not switch to production before B09.
 
+**Status (2026-10-30):** [docker-compose.hosting.yml](ops/docker-compose.hosting.yml) and [hosting.md](ops/hosting.md) now provide that override. It stays open because hosting.md records its verification as pending, and the base compose file still publishes Postgres on all interfaces.
+
 ## Original-case current-code follow-up
 
 - [x] **B100 - Admin API-key rotation leaves the original usable**
@@ -1585,3 +1600,165 @@ Streaming pages/composite cursors and per-event summary aggregation already
 exist. Complete local multi-page, backpressure, cancellation and memory checks,
 then profile representative SQL before deciding on further implementation.
 Track this as a verification gap; do not claim an unmeasured performance regression.
+
+## Review of the dashboard and monitoring work (2026-10-30)
+
+Review of the uncommitted dashboard redesign and monitoring overlay, checked against
+ARCHITECTURE, HANDOVER and every ADR. All entries come from reading the code, except
+where a reproduction is stated. Nothing here has been fixed, and nothing was run
+against a database or the hosted server. ADR-0020 records the owner's decision that
+exports, inputs and operator output use Bahrain time.
+
+**Passing without a database:** typecheck, web build, API metrics tests 5/5, reporting
+event-type test 1/1, `promtool` rule tests, and Go `-short` except
+`TestSchedulingLocationUsesTZ`. Web tests pass 17/18; the failure is `dayStartIso`.
+Both failures are expected locked tests (ADR-0007), not regressions, and stay unedited.
+**Not run:** the full API suite, database integration tests, exporter SQL against
+Postgres, the overlay under Compose, and the redesign in a browser.
+
+### Monitoring
+
+- [ ] **B102 - Double-payment alert would miss a repeat of the May incident** — **high**
+
+**Evidence and impact:** The incident was links "paid by more than one cardholder", and B18 traces that to two buyers both capturing. `pay.ts` authorizes a new transaction per attempt, and the link stores only one `transaction_id` (unique since migration 0082). The `multi_capture` query joins on that one transaction, so a second buyer's capture is never counted. Two captures on one transaction need a partial capture, and link payments capture in full. `capture.ts` rejects a capture once a transaction is fully captured. The alert therefore has almost no way to fire. Its rule test passes because it feeds in a made-up value and never runs the SQL. ops/observability/README.md partly discloses the limit, but an operator would still read a quiet alert as safety. ARCHITECTURE requires links to be single-use. B18 is fixed in code, so this is a missing detective control, not a known live double charge.
+
+**Code references:** [filspay.collector.yml](ops/observability/sql-exporter/filspay.collector.yml), [pay.ts](apps/api/src/paymentLinks/pay.ts), [capture.ts](apps/api/src/payments/capture.ts), [postmortem](docs/incidents/postmortem-2026-05.md).
+
+**Suggested fixes:** Count across transactions using the link ID already on the capture events: `pay.ts` passes `link.id` as the actor, and [events.ts](apps/api/src/transactions/events.ts) stores it in `actor_id`, despite migration 0018's comment that system actors are NULL. Group captures by `actor_id` where `actor_type = 'system'`, joined to `payment_links.id`. Grant the role those two columns, and check that `captureReview.ts` retries pass the same actor. Test the SQL against two buyers on a disposable database.
+
+- [ ] **B103 - SettlementPassFailing stays quiet when a pass fails outright** — **high**
+
+**Evidence and impact:** When the merchant query fails, `RunDailyBatch` returns an empty report and an error. `RecordDailyPass` then sets `settlement_daily_pass_failed_merchants` to 0, and the alert only fires above 0. No merchant settles and this alert stays quiet. The 0 also resets a running 15-minute `for` timer when failures alternate with such a pass. `SettlementBatchMissing` catches the result only after the day rolls over at 01:00 Bahrain. ADR-0016 decision 6 requires failed runs to be reported.
+
+**Code references:** [metrics.go](apps/settlement/internal/metrics/metrics.go), [batch.go](apps/settlement/internal/settlement/batch.go), [business.yml](ops/observability/prometheus/rules/business.yml).
+
+**Suggested fixes:** Alert on `settlement_daily_passes_total{result="failure"}` or on the age of `settlement_daily_pass_last_success_timestamp_seconds`, which no rule uses yet. Add a test for a pass that fails with no merchant results.
+
+- [ ] **B104 - BusinessMetricsMissing covers 2 of the 5 exporter queries** — medium
+
+**Evidence and impact:** Its comment says it stops a failing query from silently switching off every alert. It checks only `filspay_settlement_merchants_missing_batch` and `filspay_payment_links_multi_capture_24h`. A failing `webhook_backlog` or `reporting_lag` query would silently disable `WebhookBacklogStuck` or `ReportingOutboxLagging`. The lag query is the likeliest to fail, because it scans `outbox_events` under the role's 5-second timeout. Assumes `sql_exporter` drops only the failed query's metrics; not triggered here.
+
+**Code references:** [business.yml](ops/observability/prometheus/rules/business.yml), [filspay.collector.yml](ops/observability/sql-exporter/filspay.collector.yml), [create-metrics-role.sh](ops/observability/postgres/create-metrics-role.sh).
+
+**Suggested fixes:** Add an `absent()` for a metric from every query, and extend the rule test.
+
+- [ ] **B114 - An out-of-range METRICS_PORT stops the API at boot** — low
+
+**Evidence and impact:** Reproduced with Node: `listen(70000)` throws `ERR_SOCKET_BAD_PORT` synchronously, before the error handler that is meant to keep monitoring from taking the API down. A non-numeric value also fails config loading in both the API and settlement, despite the comment in `main.go`. Only a mistyped setting triggers this.
+
+**Code references:** [metrics.ts](apps/api/src/plugins/metrics.ts), [config.ts](apps/api/src/config.ts), [config.go](apps/settlement/internal/config/config.go), [main.go](apps/settlement/cmd/settlement/main.go).
+
+**Suggested fixes:** Treat an invalid value as metrics off and log it, or change the comments to say a bad setting fails at boot.
+
+### Merchant overview
+
+- [ ] **B105 - Quests count from the last active day, not today** — medium
+
+**Evidence and impact:** `merchant_daily_volume` only has rows for active days. `captureStreak` and `refundFreeDays` both anchor on the window's last row. A 7-day streak ending 7 October still shows "Completed" on 30 October. A merchant whose last active day had a refund shows `0 / 7` refund-free days weeks later. Display only, with no effect on fees or payouts. ADR-0007 requires Bahrain calendar dates for UI windows.
+
+**Code references:** [overviewStats.ts](apps/web/src/pages/overview/overviewStats.ts), [OverviewPage.tsx](apps/web/src/pages/overview/OverviewPage.tsx).
+
+**Suggested fixes:** Pass an end date: the earlier of today in Bahrain and the day before `to`. Add tests for a stale window.
+
+- [ ] **B106 - Refund-free quest completes for merchants who cannot refund** — medium
+
+**Evidence and impact:** Under ADR-0009 a merchant without an explicit opt-in cannot refund, so the quest completes on its own once the window spans seven days. The page never checks `refundsAvailable`, though `TransactionDrawer` does. Separately, the quest rewards avoiding refunds, which could discourage legitimate ones. The owner has not yet decided whether to keep it.
+
+**Code references:** [OverviewPage.tsx](apps/web/src/pages/overview/OverviewPage.tsx), [TransactionDrawer.tsx](apps/web/src/pages/transactions/TransactionDrawer.tsx).
+
+**Suggested fixes:** Remove the quest (recommended) or hide it unless `refundsAvailable` is true.
+
+- [ ] **B107 - Failed or loading data shows as real zeros** — medium
+
+**Evidence and impact:** While `authorized` is null, the page shows `0 waiting`, a full quest meter and `0.000 BHD` authorized. The same happens after a failed load, so a merchant can read an error state as an empty queue. The `done` flag handles null, but `percent` and the amount do not.
+
+**Code references:** [OverviewPage.tsx](apps/web/src/pages/overview/OverviewPage.tsx).
+
+**Suggested fixes:** Show `—` and an empty meter until the data arrives. Add a component test, because the page has none.
+
+- [ ] **B108 - A slow response can overwrite a newer date window** — medium
+
+**Evidence and impact:** `load` has no request guard, so a poll in flight when "Show that period" is clicked can replace the new window's data. The pattern predates this work, but the new quests and KPIs now depend on it. `TransactionListPage` in the same change has a `latestRequest` guard.
+
+**Code references:** [OverviewPage.tsx](apps/web/src/pages/overview/OverviewPage.tsx), [TransactionListPage.tsx](apps/web/src/pages/transactions/TransactionListPage.tsx).
+
+**Suggested fixes:** Reuse the `latestRequest` guard. Also pause polling while the tab is hidden: the page now sends 5 requests a minute even in a hidden tab.
+
+- [ ] **B109 - "Clear the capture queue" counts transactions the merchant cannot act on** — low
+
+**Evidence and impact:** The quest counts every authorized transaction and tells the merchant to capture or void it. A payment link with an unknown capture outcome blocks both actions until finance or a super admin resolves it (ADR-0013, ADR-0016 decision 1, enforced by `guardPaymentLinkAttempt`). The quest can then stay incomplete with nothing the merchant can do.
+
+**Code references:** [OverviewPage.tsx](apps/web/src/pages/overview/OverviewPage.tsx), [paymentLinkGuard.ts](apps/api/src/payments/paymentLinkGuard.ts).
+
+**Suggested fixes:** Exclude blocked transactions from the quest, or label them as awaiting review. This needs an API field, because the list response doesn't say a transaction is blocked.
+
+### Bahrain time (ADR-0020)
+
+- [ ] **B110 - Transaction CSV writes occurred_at in UTC** — medium
+
+**Evidence and impact:** Both CSV paths use `occurred_at.toISOString()`, while the new dashboard sidebar says "Times are Bahrain time". The new Export button makes this file easy to reach. The instant is correct and marked `Z`, but a person reading it after 21:00 UTC sees the wrong calendar day.
+
+**Code references:** [exportCsv.ts](apps/api/src/transactions/exportCsv.ts), [TransactionListPage.tsx](apps/web/src/pages/transactions/TransactionListPage.tsx).
+
+**Suggested fixes:** Write the same instant with `+03:00`, as ADR-0020 specifies. Check the streaming cursor still uses the database text and not the formatted value. Add coverage in a new test file.
+
+- [ ] **B111 - Credit effective date defaults to the browser's date** — medium, affects ledger dates
+
+**Evidence and impact:** `todayIso()` in the admin console uses the browser's local date, and its comment admits it. That value is the default credit effective date, and `credits.ts` posts both ledger legs at Bahrain midnight of that date. An operator outside Bahrain near midnight can post a credit to the wrong business day without noticing. ADR-0007 requires Bahrain UI date defaults. Credits already posted are not repaired by a fix.
+
+**Code references:** [MerchantDetailPage.tsx](apps/admin/src/pages/merchants/MerchantDetailPage.tsx), [credits.ts](apps/api/src/admin/credits.ts), [format.ts](apps/admin/src/format.ts).
+
+**Suggested fixes:** Default from the Bahrain date, reusing the offset logic already in the admin `format.ts`.
+
+- [ ] **B112 - Webhook replay window uses browser-local time** — low
+
+**Evidence and impact:** The replay page's defaults and `new Date(range.from)` read `datetime-local` values in the browser's zone. Operators outside Bahrain replay a different window than the one they typed. `localDateTimeToIso` in the merchant app already reads these as `+03:00`. ADR-0020 decision 3 applies.
+
+**Code references:** [WebhookReplayPage.tsx](apps/admin/src/pages/webhooks/WebhookReplayPage.tsx), [format.ts](apps/web/src/format.ts).
+
+**Suggested fixes:** Treat the inputs as Bahrain wall time at both edges and label them so.
+
+- [ ] **B113 - Operator logs carry UTC dates** — low
+
+**Evidence and impact:** `formatIsoDate` and the duplicate `todayStamp` write UTC dates into API logs, which read a day behind between 00:00 and 03:00 Bahrain. Compose sets no `TZ`, so the settlement daemon's log timestamps are UTC too. Logs only, with no money or merchant-facing effect.
+
+**Code references:** [dateFormat.ts](apps/api/src/lib/dateFormat.ts), [dateUtil.ts](apps/api/src/lib/dateUtil.ts), [docker-compose.yml](ops/docker-compose.yml).
+
+**Suggested fixes:** Use one Bahrain date helper and delete the duplicate. Set `TZ=Asia/Bahrain` on the services, after confirming nothing depends on the process zone. Grafana dashboards already use Asia/Bahrain.
+
+### Dashboard, lower priority
+
+- [ ] **B115 - Export link bypasses the API client** — low
+
+**Evidence and impact:** The link hard-codes `/v1/transactions/export`, ignoring `VITE_API_BASE_URL`, so it breaks on a separately hosted API. A 401 or 429 (the limit is 10 a minute) is shown or saved as a raw response. Same-origin hosting works today.
+
+**Code references:** [TransactionListPage.tsx](apps/web/src/pages/transactions/TransactionListPage.tsx), [client.ts](apps/web/src/api/client.ts).
+
+**Suggested fixes:** Download through the API client as a blob and show errors on the page.
+
+- [ ] **B116 - Transaction drawer does not keep keyboard focus inside** — low
+
+**Evidence and impact:** It declares `aria-modal="true"`, but Tab can move focus to the page behind it. It also shows the row as loaded and does not refresh when a poll updates the list.
+
+**Code references:** [TransactionDrawer.tsx](apps/web/src/pages/transactions/TransactionDrawer.tsx).
+
+**Suggested fixes:** Add a focus trap, and look the open transaction up from the current list by ID.
+
+### Status of older claims, re-checked
+
+| Item | Finding |
+|---|---|
+| `original_history.md` section 7 | Checked in the code: 7.1 to 7.3, 7.5, 7.6, 7.8, 7.9, 7.11 (OTPs and tokens), 7.12, 7.13 and 7.14 are fixed. 7.4 and 7.10 are fixed through mandatory signatures and unique indexes. 7.7's counter is BIGINT and the tier is out of new captures (ADR-0019). 7.15 stays a governance question. |
+| `randomId` in apps/web `helpers.ts` | Uses `Math.random`, but its docblock limits it to client-side list keys. Not a finding. |
+| ADR-0002 status, RUNBOOK month-end, ARCHITECTURE settings and consumer text, HANDOVER, CLAUDE.md table | Stale. Corrected on 2026-10-30, with historical text kept and dated notes added. |
+| HANDOVER versus ARCHITECTURE on credit posting dates | **Still unresolved.** The code follows ARCHITECTURE. Needs an explicit owner decision, recorded in an ADR. |
+| `FEATURE_ASYNC_CLOSE` | No application code reads it. ARCHITECTURE now says so; the row is kept pending a decision to remove it. |
+
+### Open items
+
+| Priority | Items |
+|---|---|
+| High | B102, B103 |
+| Medium | B104, B105, B106, B107, B108, B110, B111 |
+| Low | B109, B112, B113, B114, B115, B116 |
+| Awaiting verification or outside input | B09, B16, B53, B92, B94, B99, B101 |

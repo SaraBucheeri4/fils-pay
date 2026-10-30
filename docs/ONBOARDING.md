@@ -97,6 +97,9 @@ after the audit.
 >
 > **MK:** not for a monthly total
 
+*Note (2026-10-30): it did matter. ADR-0007 requires Bahrain months, and the script
+now uses them.*
+
 **FP-203 — Support balance corrections.** Support fixes wrong balances
 with **Adjust balance** in the console.
 

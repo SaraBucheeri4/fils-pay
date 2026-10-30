@@ -110,18 +110,14 @@ what the scheme was paid; finance reconciles against it.
 
 ## Month-end residue (finance)
 
-Until residue posting is automated (see ARCHITECTURE, "The scheme
-boundary"), finance runs a month-end script modelled on
-`scripts/reconcile_march.ts`:
+Residue now posts automatically for each export line at batch close, with a
+unique per-line receipt (ADR-0002, ADR-0007). There is no month-end sweep to run.
+Finance clears `scheme_rounding_residue` monthly against the scheme statement,
+using Bahrain calendar months.
 
-1. Copy the script, change the window constants at the top to the new
-   month (UTC calendar month, `YYYY-MM-01T00:00Z` to the first of the next
-   month).
-2. Run it once against production with finance on the call.
-3. Attach the log from `scripts/out/` to the month-end ticket.
-
-The script checks for an existing posting with the same description, so a
-second run is a no-op.
+`scripts/reconcile_march.ts` inspects March and is a dry run by default. Its
+`--apply` flag is a historical repair and needs its own explicit approval. Don't
+copy it for later months.
 
 > **Huda** (#fp-finance): please don't run anything for April onwards until March (FP-187) is resolved
 
