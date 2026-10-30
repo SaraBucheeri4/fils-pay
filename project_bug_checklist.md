@@ -1413,7 +1413,7 @@ Review of a1e19d7 and the proposed follow-up. These entries distinguish confirme
 
 **Dependencies / verification:** B49, B66, B70, B88. The nonexistent-trigger and same-rate comments were removed; executable code is unchanged.
 
-- [ ] **B90 - Refund enablement NULL policy contradicts an attributed migration note**
+- [x] **B90 - Refund enablement NULL policy contradicts an attributed migration note**
 
 **Category:** Documentation/policy conflict; release decision, not a proven runtime implementation bug.
 
@@ -1423,7 +1423,7 @@ Review of a1e19d7 and the proposed follow-up. These entries distinguish confirme
 
 **Decision needed:** Confirm whether enablement is an explicit opt-in or a pause switch, document the true/false/NULL truth table, and test each state before B16 launches. Do not silently flip existing NULL rows or change financial authorization from an unverified comment. The applied migration is preserved as historical evidence.
 
-- [ ] **B91 - Transaction serialization omits refundedFils**
+- [x] **B91 - Transaction serialization omits refundedFils**
 
 **Category:** Confirmed response-contract gap; relevant before refund UI launch.
 
@@ -1516,3 +1516,28 @@ rejected. Do not change this before the acquirer confirms the format (ADR-0012).
 - API: 21 refund tests with NULL refunds_enabled (ADR-0009; all pass with opt-in on), 5 loopback webhook tests (B63; pass with the block relaxed), 5 callback tests (ADR-0012), 4 adjustment tests expecting 600 fils for "6.00" (ADR-0001), and one each for KYC filename (ARCHITECTURE), fee display (B29), bulk KYC and webhook delete (ADR-0008), and backoff jitter (B59).
 - Go: 2 rebuild tests expecting lifetime gross (ADR-0007), 1 expecting UTC scheduling (ADR-0007), 1 expecting a rewritten paid batch (ADR-0010).
 - Web and scripts: 1 each expecting UTC boundaries (ADR-0007).
+
+
+## FP-300 refund release (2026-10-30)
+
+The unfinished feature is refunds. Verified on disposable Postgres through the
+API, with the real settlement binary, dispatcher pass and reporting consumer. The
+webhook receiver was simulated because the SSRF block rejects local receivers.
+Nothing here was tested against the hosted server.
+
+**Correction:** B36 and B38 were ticked earlier on evidence from the export
+generator alone. The route returned 200 with an empty body, because its async
+handler did not return the reply. Fixed; a route test now covers a page break
+across 2600 rows sharing one timestamp.
+
+| Gap | Change |
+|---|---|
+| No way to opt a merchant in | Audited single-merchant admin action and console button (ADR-0015) |
+| Reports hid refunds | Added to volumes, transactions report, CSV (appended column), settlement summary and the Overview page |
+| Drawer parked with the wrong URL and fils input | Restored on `/v1/refunds`, reads BD text per ADR-0001, shown only with the flag and opt-in |
+| 13th browser-local date on the merchant page, missed in the earlier fix | Bahrain (ADR-0007) |
+
+**B16 stays open until the release is switched on.** `FEATURE_REFUNDS` stays
+false by default, so a deployment needs it set and at least one merchant enabled
+before a refund can run there. The drawer has typecheck, build and helper-test
+evidence, but has not been clicked through in a browser.

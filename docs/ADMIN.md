@@ -95,6 +95,11 @@ There is no console screen yet. Finance or a super admin lists them with
 `retry_capture` to resend the same acquirer key, or `release` only once the
 acquirer has confirmed no charge.
 
+**Refunds** — off for every merchant until enabled here (ADR-0009, ADR-0015). A
+finance or super admin uses **Enable refunds** on the merchant page, one merchant
+at a time, and each change is audited. Refunds also need `FEATURE_REFUNDS=true`
+on the API. Without both, the route refuses and the dashboard hides the button.
+
 ## Webhooks
 
 > **— unsigned:** replay-batch reuses the original delivery ids, so receivers dedupe fine.

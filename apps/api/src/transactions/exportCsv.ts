@@ -54,7 +54,7 @@ export async function* transactionsExportChunks(pool: Pool, filters: Transaction
  const client = await pool.connect();
  try {
   await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
-  yield "id,status,amount_bhd,captured_bhd,reference,occurred_at\n";
+  yield "id,status,amount_bhd,captured_bhd,reference,occurred_at,refunded_bhd\n";
   let cursorTime: string | null = null;
   let cursorId: string | null = null;
   const status = filters.status?.length ? filters.status : null;
@@ -68,7 +68,7 @@ export async function* transactionsExportChunks(pool: Pool, filters: Transaction
        AND ($5::timestamptz IS NULL OR (occurred_at, id) > ($5, $6::uuid))
      ORDER BY occurred_at, id LIMIT 1000`,
     [filters.merchantId, filters.from ?? null, filters.to ?? null, status, cursorTime, cursorId]);
-   for (const row of result.rows) yield toCsvRow(row) + "\n";
+   for (const row of result.rows) yield `${toCsvRow(row)},${formatBhd(toFils(Number(row.refunded_fils)))}\n`;
    if (result.rows.length < 1000) break;
    const last = result.rows[result.rows.length - 1]!;
    cursorTime = last.cursor_time;

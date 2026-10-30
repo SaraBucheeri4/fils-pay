@@ -159,7 +159,9 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         status,
       }));
 
-      reply
+      // Returned so the async handler waits for the stream instead of ending
+      // the response empty.
+      return reply
         .header("content-type", "text/csv; charset=utf-8")
         .header("content-disposition", 'attachment; filename="transactions.csv"')
         .send(csv);

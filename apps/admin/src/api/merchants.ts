@@ -63,3 +63,14 @@ export function recomputeTransactionStatuses(merchantId: string): Promise<Recomp
     { method: "POST" },
   );
 }
+
+/** `POST /v1/admin/merchants/:id/refunds-enabled`. Finance and super admin only. */
+export function setRefundsEnabled(
+  merchantId: string,
+  enabled: boolean,
+): Promise<{ merchantId: string; refundsEnabled: boolean }> {
+  return request(`/v1/admin/merchants/${encodeURIComponent(merchantId)}/refunds-enabled`, {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
+  });
+}

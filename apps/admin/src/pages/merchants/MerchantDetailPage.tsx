@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatBhd, parseBhdToFils, toFils } from "@filspay/money";
 import { dateOnly, dateTime } from "../../format.js";
-import { getMerchant, recomputeTransactionStatuses, submitKycReview } from "../../api/merchants.js";
+import { getMerchant, recomputeTransactionStatuses, setRefundsEnabled, submitKycReview } from "../../api/merchants.js";
 import { adjustBalance } from "../../api/balanceAdjustments.js";
 import { issueCredit } from "../../api/credits.js";
 import { rotateApiKey } from "../../api/apiKeys.js";
@@ -140,6 +140,27 @@ export function MerchantDetailPage() {
     }
   }
 
+  /** ADR-0015: an audited opt-in for this one merchant. */
+  async function handleToggleRefunds(enabled: boolean): Promise<void> {
+    if (!id) return;
+    const prompt = enabled
+      ? "Enable refunds for this merchant? It can then return money to cardholders."
+      : "Disable refunds for this merchant?";
+    if (!window.confirm(prompt)) return;
+    setBusy(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const result = await setRefundsEnabled(id, enabled);
+      setNotice(result.refundsEnabled ? "Refunds enabled." : "Refunds disabled.");
+      await load();
+    } catch (err) {
+      setActionError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleIssueCredit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     if (!id) return;
@@ -266,11 +287,20 @@ export function MerchantDetailPage() {
         <dt>Current negotiated rate</dt>
         <dd>
           {detail.currentFeeSchedule
-            ? `${(detail.currentFeeSchedule.mdrBps / 100).toFixed(2)}% (${detail.currentFeeSchedule.mdrBps} bps), effective ${new Date(detail.currentFeeSchedule.effectiveFrom).toLocaleDateString()}`
+            ? `${(detail.currentFeeSchedule.mdrBps / 100).toFixed(2)}% (${detail.currentFeeSchedule.mdrBps} bps), effective ${dateOnly(detail.currentFeeSchedule.effectiveFrom)}`
             : "no negotiated schedule on file (uses MDR above)"}
         </dd>
         <dt>Mode</dt>
         <dd>{merchant.testMode ? "test" : "live"}</dd>
+        <dt>Refunds</dt>
+        <dd>
+          {merchant.refundsEnabled === true ? "enabled" : "not enabled"}{" "}
+          <RequireRole allow={["finance", "super_admin"]}>
+            <button type="button" onClick={() => void handleToggleRefunds(merchant.refundsEnabled !== true)}>
+              {merchant.refundsEnabled === true ? "Disable refunds" : "Enable refunds"}
+            </button>
+          </RequireRole>
+        </dd>
         <dt>Created</dt>
         <dd>{dateTime(merchant.createdAt)}</dd>
         {profile ? (

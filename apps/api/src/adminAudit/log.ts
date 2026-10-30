@@ -7,6 +7,7 @@ export type AdminAuditAction =
   | "settlement_run_batch"
   | "balance_rebuild"
   | "payment_link_capture_review"
+  | "merchant_refunds_enabled_change"
   | "webhook_batch_replay"
   | "webhook_delivery_archive_create"
   | "webhook_delivery_archive_replay"

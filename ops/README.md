@@ -57,6 +57,7 @@ first.
 | api | `DATABASE_URL`, `SETTLEMENT_INTERNAL_URL`, `SETTLEMENT_INTERNAL_TOKEN` | `environment:` |
 | api, seed | `NODE_ENV` | `environment:` (`development`) |
 | api | `WEBHOOK_SECRET_ENCRYPTION_KEY` | required unless `NODE_ENV` is exactly `development` or `test`, where a built-in dev key is used (see below) |
+| api | `FEATURE_REFUNDS` | `false`; set `true` to open `POST /v1/refunds`. Merchants still need the opt-in (ADR-0009) |
 | api | `ACQUIRER_CALLBACK_SIGNING_SECRET` | required in production only; compose does **not** load `.env.docker`, so it is unset locally |
 | settlement | `DATABASE_URL` | `environment:` |
 | settlement | `SETTLEMENT_INTERNAL_TOKEN` | `environment:` (`dev-token`); the daemon exits at boot without it |

@@ -60,6 +60,7 @@ export interface AdminMerchantSummary {
   kycPassed: boolean;
   mdrBps: number;
   testMode: boolean;
+  refundsEnabled: boolean | null;
   createdAt: string;
 }
 

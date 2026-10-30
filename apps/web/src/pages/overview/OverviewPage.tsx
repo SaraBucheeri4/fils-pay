@@ -112,6 +112,8 @@ export function OverviewPage() {
             <th>Captured</th>
             <th>Gross</th>
             <th>Voided</th>
+            <th>Refunds</th>
+            <th>Refunded</th>
             <th />
           </tr>
         </thead>
@@ -122,6 +124,8 @@ export function OverviewPage() {
               <td>{formatCount(point.capturedCount)}</td>
               <td>{bhd(point.capturedGrossFils)}</td>
               <td>{formatCount(point.voidedCount)}</td>
+              <td>{formatCount(point.refundCount)}</td>
+              <td>{bhd(point.refundGrossFils)}</td>
               <td className="dash-bar-cell">
                 {/* A plain CSS bar, scaled to the window's own peak — no
                     charting library, no new dependency. */}

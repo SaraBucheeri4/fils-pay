@@ -44,7 +44,6 @@ export function getTransactionEvents(id: string): Promise<TransactionEventDto[]>
 /** Omitting `amountFils` captures everything still outstanding — capture.ts's
  *  own default, so the caller passes nothing rather than computing the
  *  remainder client-side and risking a stale value. */
-// MK: refund client fn moved out of here into RefundDrawer for now
 export function captureTransaction(
   id: string,
   input: { amountFils?: number },

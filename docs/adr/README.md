@@ -19,3 +19,4 @@ one that supersedes it and update the status line of the old one.
 | 0012 | [Acquirer callback signatures are mandatory](0012-mandatory-acquirer-callback-signatures.md) | Accepted | 2026-10-30 |
 | 0013 | [Unknown capture outcomes block a payment link](0013-payment-link-unknown-capture-outcome.md) | Accepted | 2026-10-30 |
 | 0014 | [MDR recalculation ignores the volume tier](0014-volume-tier-excluded-from-recalculation.md) | Accepted; interim pending finance | 2026-10-30 |
+| 0015 | [Who enables refunds for a merchant](0015-refund-opt-in-administration.md) | Accepted | 2026-10-30 |

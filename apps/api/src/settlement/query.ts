@@ -413,11 +413,14 @@ export interface SettlementSummaryDto {
   periodTo: string;
   transactionCount: number;
   totalCapturedFils: number;
+  /** Refunds in the same Bahrain window; capture totals stay gross. */
+  totalRefundedFils: number;
 }
 
 interface SettlementSummaryRow {
   transaction_count: string;
   total_captured_fils: string | number | null;
+  total_refunded_fils: string | number | null;
 }
 
 /** Gross captured in window, joined through transaction_events for batch parity. */
@@ -438,7 +441,10 @@ export async function getSettlementSummary(
           AND te.occurred_at >= $2 AND te.occurred_at < $3
      )
      SELECT COUNT(DISTINCT id) AS transaction_count,
-            COALESCE(SUM(captured_fils), 0) AS total_captured_fils
+            COALESCE(SUM(captured_fils), 0) AS total_captured_fils,
+            (SELECT COALESCE(SUM(amount_fils), 0) FROM refunds
+              WHERE merchant_id = $1 AND status = 'succeeded'
+                AND occurred_at >= $2 AND occurred_at < $3) AS total_refunded_fils
        FROM captured`,
     [input.merchantId, windowStart, windowEnd],
   );
@@ -449,5 +455,6 @@ export async function getSettlementSummary(
     periodTo: input.to,
     transactionCount: Number(row?.transaction_count ?? 0),
     totalCapturedFils: Number(row?.total_captured_fils ?? 0),
+    totalRefundedFils: Number(row?.total_refunded_fils ?? 0),
   };
 }

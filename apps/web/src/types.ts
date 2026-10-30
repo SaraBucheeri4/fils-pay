@@ -70,7 +70,7 @@ export interface DashboardMe {
   impersonation?: { grantId: string; adminUserId: string };
   email: string;
   role: MerchantRole;
-  merchant: { id: string; displayName: string; onboardingStatus: string };
+  merchant: { id: string; displayName: string; onboardingStatus: string; refundsAvailable?: boolean };
 }
 
 // --- transactions ---
@@ -271,6 +271,8 @@ export interface VolumePointDto {
   capturedCount: number;
   capturedGrossFils: number;
   voidedCount: number;
+  refundCount: number;
+  refundGrossFils: number;
 }
 
 /** `readModelAsOf` is nullable on the two lagged widgets: it reads

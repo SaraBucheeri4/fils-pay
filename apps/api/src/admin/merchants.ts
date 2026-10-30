@@ -5,6 +5,9 @@ import {
   getCurrentFeeScheduleForDisplay,
   type CurrentFeeScheduleDisplay,
 } from "../fees/currentFeeScheduleDisplay.js";
+import { insertAdminAuditLog } from "../adminAudit/log.js";
+import { withTransaction } from "../db/withTransaction.js";
+import { NotFoundError } from "../lib/errors.js";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100; // matches the dashboard page size — MK
@@ -17,6 +20,8 @@ export interface AdminMerchantSummary {
   kycPassed: boolean;
   mdrBps: number;
   testMode: boolean;
+  /** ADR-0009: only true allows refunds; false and null both deny. */
+  refundsEnabled: boolean | null;
   createdAt: Date;
 }
 
@@ -28,6 +33,7 @@ interface MerchantRow {
   kyc_passed: boolean;
   mdr_bps: number;
   test_mode: boolean;
+  refunds_enabled: boolean | null;
   created_at: Date;
 }
 
@@ -40,6 +46,7 @@ function toSummary(row: MerchantRow): AdminMerchantSummary {
     kycPassed: row.kyc_passed,
     mdrBps: row.mdr_bps,
     testMode: row.test_mode,
+    refundsEnabled: row.refunds_enabled,
     createdAt: row.created_at,
   };
 }
@@ -117,7 +124,7 @@ export async function listMerchantsForAdmin(
 
   const result = await pool.query<MerchantRow & { created_at_text: string }>(
     `SELECT m.id, m.display_name, m.status, m.onboarding_status, m.kyc_passed,
-            m.mdr_bps, m.test_mode, m.created_at, m.created_at::text AS created_at_text
+            m.mdr_bps, m.test_mode, m.refunds_enabled, m.created_at, m.created_at::text AS created_at_text
        FROM merchants m
        LEFT JOIN merchant_business_profiles bp ON bp.merchant_id = m.id
       WHERE ($1::text IS NULL
@@ -223,7 +230,7 @@ export async function getMerchantDetailForAdmin(
   merchantId: string,
 ): Promise<AdminMerchantDetail | null> {
   const merchantResult = await pool.query<MerchantRow>(
-    `SELECT id, display_name, status, onboarding_status, kyc_passed, mdr_bps, test_mode, created_at
+    `SELECT id, display_name, status, onboarding_status, kyc_passed, mdr_bps, test_mode, refunds_enabled, created_at
        FROM merchants WHERE id = $1`,
     [merchantId],
   );
@@ -326,4 +333,31 @@ export async function getMerchantDetailForAdmin(
 export async function merchantExists(pool: Pool, merchantId: string): Promise<boolean> {
   const result = await pool.query(`SELECT 1 FROM merchants WHERE id = $1`, [merchantId]);
   return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * ADR-0015: sets one merchant's refund opt-in, audited in the same
+ * transaction. Exists for one merchant at a time; never a bulk enable.
+ */
+export async function setMerchantRefundsEnabled(
+  pool: Pool,
+  input: { merchantId: string; adminUserId: string; enabled: boolean },
+): Promise<{ merchantId: string; refundsEnabled: boolean }> {
+  return withTransaction(pool, async (client) => {
+    const existing = await client.query<{ refunds_enabled: boolean | null }>(
+      `SELECT refunds_enabled FROM merchants WHERE id = $1 FOR UPDATE`,
+      [input.merchantId],
+    );
+    const row = existing.rows[0];
+    if (!row) throw new NotFoundError("merchant_not_found");
+    await client.query(`UPDATE merchants SET refunds_enabled = $2 WHERE id = $1`, [input.merchantId, input.enabled]);
+    await insertAdminAuditLog(client, {
+      adminUserId: input.adminUserId,
+      action: "merchant_refunds_enabled_change",
+      targetType: "merchant",
+      targetId: input.merchantId,
+      metadata: { before: row.refunds_enabled, after: input.enabled },
+    });
+    return { merchantId: input.merchantId, refundsEnabled: input.enabled };
+  });
 }

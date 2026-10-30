@@ -5,6 +5,7 @@ import {
   getMerchantDetailForAdmin,
   listMerchantsForAdmin,
   merchantExists,
+  setMerchantRefundsEnabled,
   UUID_RE,
 } from "../admin/merchants.js";
 import { rotateApiKeyAsAdmin } from "../admin/apiKeys.js";
@@ -174,6 +175,22 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
       });
 
       reply.code(200).send(result);
+    },
+  );
+
+  /** ADR-0015: one merchant's refund opt-in. */
+  app.post<{ Params: MerchantIdParams; Body: { enabled?: boolean } }>(
+    "/:id/refunds-enabled",
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
+    async (request) => {
+      const adminAuth = request.adminAuth;
+      if (!adminAuth) throw new UnauthorizedError("unauthenticated");
+      assertUuidParam(request.params.id, "merchant_not_found");
+      const enabled = request.body?.enabled;
+      if (typeof enabled !== "boolean") {
+        throw new BadRequestError("invalid_request", "enabled must be true or false");
+      }
+      return setMerchantRefundsEnabled(app.db, { merchantId: request.params.id, adminUserId: adminAuth.adminUserId, enabled });
     },
   );
 

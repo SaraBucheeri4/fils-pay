@@ -92,6 +92,8 @@ services:
       SETTLEMENT_INTERNAL_URL: http://settlement:8091
       # Must match the settlement service's token below.
       SETTLEMENT_INTERNAL_TOKEN: dev-token
+      # Off unless the host sets it; merchants also need the ADR-0009 opt-in.
+      FEATURE_REFUNDS: ${FEATURE_REFUNDS:-false}
     # Wait for the schema, and for the seed when the seed profile is on.
     depends_on:
       migrate:
