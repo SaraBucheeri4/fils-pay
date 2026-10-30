@@ -18,6 +18,7 @@ import (
 
 	"github.com/filspay/settlement/internal/config"
 	"github.com/filspay/settlement/internal/ledger"
+	"github.com/filspay/settlement/internal/metrics"
 	"github.com/filspay/settlement/internal/settlement"
 )
 
@@ -87,7 +88,9 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 		return
 	}
 
+	started := time.Now()
 	report, err := settlement.RunDailyBatch(ctx, db, businessDate, nil)
+	metrics.RecordDailyPass(time.Since(started), len(report.MerchantResults), len(report.Failures), err)
 	if err != nil {
 		log.Printf("settlement daemon: RunDailyBatch(%s): %d merchant(s) failed: %v", businessDate.Format("2006-01-02"), len(report.Failures), err)
 	}

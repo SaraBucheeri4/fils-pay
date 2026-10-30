@@ -1,0 +1,97 @@
+# Services and business health. Alerts show in Grafana only; nothing sends
+# notifications. Each `runbook` names a section of ops/observability/README.md.
+groups:
+  - name: business
+    rules:
+      - alert: PaymentLinkMultipleCaptures
+        # A link is single-use, so one of these is already wrong. No waiting.
+        expr: filspay_payment_links_multi_capture_24h > 0
+        labels:
+          severity: page
+        annotations:
+          summary: A payment link has more than one capture in the last 24 hours
+          runbook: "ops/observability/README.md#paymentlinkmultiplecaptures"
+
+      - alert: SettlementBatchMissing
+        expr: filspay_settlement_merchants_missing_batch > 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $value }} merchant(s) have no closed batch for the last business day"
+          runbook: "ops/observability/README.md#settlementbatchmissing"
+
+      - alert: WebhookBacklogStuck
+        expr: filspay_webhook_oldest_due_age_seconds > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: A webhook delivery has been due for over 15 minutes
+          runbook: "ops/observability/README.md#webhookbacklogstuck"
+
+      - alert: ReportingOutboxLagging
+        expr: filspay_reporting_outbox_oldest_unconsumed_age_seconds > 900
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The reporting worker is over 15 minutes behind the outbox
+          runbook: "ops/observability/README.md#reportingoutboxlagging"
+
+      # Without this, a failing query would silently switch off every alert above.
+      - alert: BusinessMetricsMissing
+        expr: absent(filspay_settlement_merchants_missing_batch) or absent(filspay_payment_links_multi_capture_24h)
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The business health metrics are not being collected
+          runbook: "ops/observability/README.md#businessmetricsmissing"
+
+  - name: services
+    rules:
+      - alert: ApiErrorRateHigh
+        # The traffic floor stops one failed request on a quiet box from firing.
+        expr: >-
+          sum(rate(http_request_duration_seconds_count{job="api",status_class="5xx"}[5m]))
+          / sum(rate(http_request_duration_seconds_count{job="api"}[5m])) > 0.05
+          and sum(rate(http_request_duration_seconds_count{job="api"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: Over 5% of API requests are failing with a 5xx
+          runbook: "ops/observability/README.md#apierrorratehigh"
+
+      - alert: ApiLatencyHigh
+        expr: >-
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="api"}[5m]))) > 2.5
+          and sum(rate(http_request_duration_seconds_count{job="api"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The slowest 5% of API requests are taking over 2.5 seconds
+          runbook: "ops/observability/README.md#apilatencyhigh"
+
+      # A stalled dispatcher creates no new deliveries, so the backlog alert
+      # alone would stay quiet.
+      - alert: WebhookDispatcherStalled
+        expr: time() - webhook_dispatcher_last_pass_timestamp_seconds > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: The webhook dispatcher has not finished a pass in over 15 minutes
+          runbook: "ops/observability/README.md#webhookdispatcherstalled"
+
+      - alert: SettlementPassFailing
+        # The daemon retries every minute, so this outlasts a passing blip.
+        expr: settlement_daily_pass_failed_merchants > 0
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $value }} merchant(s) keep failing the daily settlement pass"
+          runbook: "ops/observability/README.md#settlementpassfailing"

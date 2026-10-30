@@ -1,0 +1,124 @@
+# Optional monitoring overlay: Prometheus, Grafana and exporters. See
+# observability/README.md. Run it alongside the stack, naming the services so
+# nothing else is recreated:
+#
+#   docker compose -f ops/docker-compose.yml -f ops/docker-compose.observability.yml \
+#     run --rm metrics-role
+#   docker compose -f ops/docker-compose.yml -f ops/docker-compose.observability.yml \
+#     up -d --no-deps prometheus grafana postgres-exporter sql-exporter node-exporter cadvisor
+#
+# Grafana and Prometheus bind to loopback only; reach them on a server through
+# an SSH tunnel. The exporters publish no ports.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-500MB}
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus:/etc/prometheus:ro
+      - filspay_prometheus:/prometheus
+    mem_limit: 384m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      # Set your own on anything but a laptop.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-filspay_dev_grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/infrastructure.json
+    ports:
+      # The api already has 3000.
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - filspay_grafana:/var/lib/grafana
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # Turns on the separate /metrics port. Unpublished, so only Prometheus reaches
+  # it. Takes effect when these two containers are next recreated.
+  api:
+    environment:
+      METRICS_PORT: "9464"
+
+  settlement:
+    environment:
+      METRICS_PORT: "9464"
+
+  sql-exporter:
+    image: burningalchemist/sql_exporter:0.17.1
+    command: ["-config.file=/etc/sql-exporter/sql_exporter.yml"]
+    environment:
+      SQLEXPORTER_TARGET_DSN: postgres://filspay_metrics:${METRICS_DB_PASSWORD:-filspay_dev_metrics}@postgres:5432/${METRICS_DB_NAME:-filspay}?sslmode=disable
+    volumes:
+      - ./observability/sql-exporter:/etc/sql-exporter:ro
+    mem_limit: 64m
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${METRICS_DB_NAME:-filspay}?sslmode=disable
+      DATA_SOURCE_USER: filspay_metrics
+      DATA_SOURCE_PASS: ${METRICS_DB_PASSWORD:-filspay_dev_metrics}
+    mem_limit: 64m
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    mem_limit: 64m
+    restart: unless-stopped
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.60.6
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    mem_limit: 192m
+    restart: unless-stopped
+
+  # One-off: creates or updates the read-only role the exporters log in as.
+  # Safe to re-run. Behind a profile so a plain `up` doesn't start it.
+  metrics-role:
+    profiles: ["observability-init"]
+    image: postgres:16-alpine
+    command: ["sh", "/create-metrics-role.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_ADMIN_USER:-filspay}
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:-filspay_dev_password}
+      PGDATABASE: ${METRICS_DB_NAME:-filspay}
+      METRICS_DB_PASSWORD: ${METRICS_DB_PASSWORD:-filspay_dev_metrics}
+    volumes:
+      - ./observability/postgres/create-metrics-role.sh:/create-metrics-role.sh:ro
+
+volumes:
+  filspay_prometheus:
+  filspay_grafana:

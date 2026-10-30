@@ -41,8 +41,9 @@ in an existing Postgres volume; changing its environment is not a rotation.
 For a later authorized host release, configure DNS and permit ports 80/443 for
 Caddy's automatic certificates. Persist its certificate volumes. Do not enable
 the `local-dev-only` or `local-seed-only` profiles. The seed remains destructive.
-Per-service database roles/TLS, backups and monitoring remain operational work
-from HANDOVER, not claims established by this overlay.
+Per-service database roles/TLS and backups remain operational work from HANDOVER,
+not claims established by this overlay. Monitoring is a separate optional overlay:
+see [observability/README.md](observability/README.md).
 
 Local verification pending: image build, HTTPS routing, login with secure
 cookies on both hostnames and KYC restore. Docker engine access failed during

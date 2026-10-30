@@ -3,6 +3,7 @@ import { loadConfig } from "./config.js";
 import { createPool } from "./db/pool.js";
 import { markDbConnectedOnce } from "./health/state.js";
 import { formatIsoDate } from "./lib/dateFormat.js";
+import { createApiMetrics, startMetricsServer } from "./plugins/metrics.js";
 import { startWebhookDispatcher, type WebhookDispatcherHandle } from "./webhooks/dispatcher.js";
 import { createFetchTransport } from "./webhooks/transport.js";
 
@@ -16,7 +17,8 @@ async function main(): Promise<void> {
   // One transport per process: the dispatcher's background pass and the
   // merchant-facing "send test event" route both run on this same instance.
   const webhookTransport = createFetchTransport();
-  const app = buildApp(config, pool, { webhookTransport });
+  const metrics = config.metricsPort > 0 ? createApiMetrics() : undefined;
+  const app = buildApp(config, pool, { webhookTransport, metrics });
 
   // Fail fast if the DB is unreachable at boot.
   await pool.query("SELECT 1");
@@ -30,7 +32,10 @@ async function main(): Promise<void> {
   // returns a non-listening instance every route test's app.inject(...)
   // uses with no live background LISTEN session or timer wanted.
   // am: we only run one replica anyway (512mb). fine
-  const dispatcher: WebhookDispatcherHandle = startWebhookDispatcher(pool, webhookTransport, config);
+  const dispatcher: WebhookDispatcherHandle = startWebhookDispatcher(pool, webhookTransport, config, () => {
+    metrics?.dispatcherLastPass.setToCurrentTime();
+  });
+  const metricsServer = metrics ? startMetricsServer(metrics, config.metricsPort) : undefined;
 
   let shuttingDown = false;
   /**
@@ -42,6 +47,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`[index] received ${signal}, shutting down`);
+    metricsServer?.close();
     dispatcher
       .stop()
       .then(() => app.close())

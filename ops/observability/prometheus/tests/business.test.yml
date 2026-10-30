@@ -1,0 +1,178 @@
+rule_files:
+  - ../rules/business.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: PaymentLinkMultipleCaptures fires at once, and only above zero
+    interval: 1m
+    input_series:
+      - series: 'filspay_payment_links_multi_capture_24h{job="sql-exporter"}'
+        values: "0 0 1 1"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PaymentLinkMultipleCaptures
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: PaymentLinkMultipleCaptures
+        exp_alerts:
+          - exp_labels: { severity: page, job: sql-exporter }
+            exp_annotations:
+              summary: A payment link has more than one capture in the last 24 hours
+              runbook: "ops/observability/README.md#paymentlinkmultiplecaptures"
+
+  - name: SettlementBatchMissing waits 10 minutes and names the count
+    interval: 1m
+    input_series:
+      - series: 'filspay_settlement_merchants_missing_batch{job="sql-exporter"}'
+        values: "3x20"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: SettlementBatchMissing
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: SettlementBatchMissing
+        exp_alerts:
+          - exp_labels: { severity: page, job: sql-exporter }
+            exp_annotations:
+              summary: "3 merchant(s) have no closed batch for the last business day"
+              runbook: "ops/observability/README.md#settlementbatchmissing"
+
+  - name: WebhookBacklogStuck ignores a backlog that clears
+    interval: 1m
+    input_series:
+      - series: 'filspay_webhook_oldest_due_age_seconds{job="sql-exporter"}'
+        values: "1000 1000 0x15"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: WebhookBacklogStuck
+        exp_alerts: []
+
+  - name: WebhookBacklogStuck fires when it does not clear
+    interval: 1m
+    input_series:
+      - series: 'filspay_webhook_oldest_due_age_seconds{job="sql-exporter"}'
+        values: "1000x15"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: WebhookBacklogStuck
+        exp_alerts:
+          - exp_labels: { severity: page, job: sql-exporter }
+            exp_annotations:
+              summary: A webhook delivery has been due for over 15 minutes
+              runbook: "ops/observability/README.md#webhookbacklogstuck"
+
+  - name: ReportingOutboxLagging fires when behind
+    interval: 1m
+    input_series:
+      - series: 'filspay_reporting_outbox_oldest_unconsumed_age_seconds{job="sql-exporter"}'
+        values: "1000x15"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ReportingOutboxLagging
+        exp_alerts:
+          - exp_labels: { severity: ticket, job: sql-exporter }
+            exp_annotations:
+              summary: The reporting worker is over 15 minutes behind the outbox
+              runbook: "ops/observability/README.md#reportingoutboxlagging"
+
+  - name: BusinessMetricsMissing fires when the queries stop reporting
+    interval: 1m
+    input_series:
+      - series: 'filspay_payment_links_multi_capture_24h{job="sql-exporter"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: BusinessMetricsMissing
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations:
+              summary: The business health metrics are not being collected
+              runbook: "ops/observability/README.md#businessmetricsmissing"
+
+  - name: ApiErrorRateHigh fires over 5% with real traffic
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{job="api",status_class="5xx"}'
+        values: "0+60x20"
+      - series: 'http_request_duration_seconds_count{job="api",status_class="2xx"}'
+        values: "0+60x20"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: ApiErrorRateHigh
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: Over 5% of API requests are failing with a 5xx
+              runbook: "ops/observability/README.md#apierrorratehigh"
+
+  - name: ApiErrorRateHigh stays quiet on a nearly idle box
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{job="api",status_class="5xx"}'
+        values: "0+1x20"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: ApiErrorRateHigh
+        exp_alerts: []
+
+  - name: ApiLatencyHigh fires when p95 is in the slowest buckets
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{job="api",le="2.5"}'
+        values: "0x30"
+      - series: 'http_request_duration_seconds_bucket{job="api",le="5"}'
+        values: "0+60x30"
+      - series: 'http_request_duration_seconds_bucket{job="api",le="+Inf"}'
+        values: "0+60x30"
+      - series: 'http_request_duration_seconds_count{job="api",status_class="2xx"}'
+        values: "0+60x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ApiLatencyHigh
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations:
+              summary: The slowest 5% of API requests are taking over 2.5 seconds
+              runbook: "ops/observability/README.md#apilatencyhigh"
+
+  - name: WebhookDispatcherStalled fires when passes stop
+    interval: 1m
+    input_series:
+      - series: 'webhook_dispatcher_last_pass_timestamp_seconds{job="api"}'
+        values: "60x30"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: WebhookDispatcherStalled
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: WebhookDispatcherStalled
+        exp_alerts:
+          - exp_labels: { severity: page, job: api }
+            exp_annotations:
+              summary: The webhook dispatcher has not finished a pass in over 15 minutes
+              runbook: "ops/observability/README.md#webhookdispatcherstalled"
+
+  - name: SettlementPassFailing clears when a retry succeeds
+    interval: 1m
+    input_series:
+      - series: 'settlement_daily_pass_failed_merchants{job="settlement"}'
+        values: "2x5 0x20"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SettlementPassFailing
+        exp_alerts: []
+
+  - name: SettlementPassFailing fires when failures persist
+    interval: 1m
+    input_series:
+      - series: 'settlement_daily_pass_failed_merchants{job="settlement"}'
+        values: "2x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: SettlementPassFailing
+        exp_alerts:
+          - exp_labels: { severity: page, job: settlement }
+            exp_annotations:
+              summary: "2 merchant(s) keep failing the daily settlement pass"
+              runbook: "ops/observability/README.md#settlementpassfailing"

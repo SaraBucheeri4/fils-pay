@@ -20,6 +20,8 @@ import (
 // All fields are read once at boot; changing an environment variable needs a
 // restart of the process.
 type Config struct {
+	// MetricsPort serves /metrics from the daemon. 0 leaves metrics off.
+	MetricsPort int
 	DatabaseURL string
 	// PGPoolMaxConns stays small — this worker processes merchants
 	// sequentially (never concurrently), so it never needs more than a
@@ -97,7 +99,13 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	metricsPort, err := parseIntEnv("METRICS_PORT", 0)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
+		MetricsPort:           metricsPort,
 		DatabaseURL:           databaseURL,
 		PGPoolMaxConns:        int32(maxConns),
 		DaemonRunDelayMinutes: runDelay,

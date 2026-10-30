@@ -10,6 +10,8 @@
 export interface Config {
   nodeEnv: "development" | "test" | "production";
   port: number;
+  /** Port for the separate /metrics server. 0 leaves metrics off. */
+  metricsPort: number;
   databaseUrl: string;
 
   pgPoolMax: number;
@@ -250,6 +252,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     nodeEnv,
     port: parseIntEnv(env.PORT, 3000),
+    metricsPort: parseIntEnv(env.METRICS_PORT, 0),
     databaseUrl,
 
     pgPoolMax: parseIntEnv(env.PG_POOL_MAX, 5),

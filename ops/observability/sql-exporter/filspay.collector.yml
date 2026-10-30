@@ -1,0 +1,110 @@
+# Business health, read from the live database by the read-only filspay_metrics
+# role. Counts and ages only: no money amounts, merchant IDs or payloads. Any
+# new column used here also needs a grant in postgres/create-metrics-role.sh.
+collector_name: filspay_business
+
+metrics:
+  - metric_name: filspay_webhook_deliveries_due
+    type: gauge
+    help: Pending deliveries the dispatcher should already have attempted.
+    values: [due]
+    query_ref: webhook_backlog
+  - metric_name: filspay_webhook_oldest_due_age_seconds
+    type: gauge
+    help: How long the oldest due delivery has been waiting. 0 when none are due.
+    values: [oldest_due_age_seconds]
+    query_ref: webhook_backlog
+  - metric_name: filspay_webhook_deliveries_exhausted_24h
+    type: gauge
+    help: Deliveries that used up their retries in the last 24 hours.
+    values: [exhausted_24h]
+    query_ref: webhook_backlog
+
+  - metric_name: filspay_reporting_outbox_unconsumed
+    type: gauge
+    help: Outbox events the reporting worker has not consumed.
+    values: [unconsumed]
+    query_ref: reporting_lag
+  - metric_name: filspay_reporting_outbox_oldest_unconsumed_age_seconds
+    type: gauge
+    help: Age of the oldest event the reporting worker has not consumed. 0 when caught up.
+    values: [oldest_age_seconds]
+    query_ref: reporting_lag
+
+  - metric_name: filspay_settlement_last_batch_age_seconds
+    type: gauge
+    help: Time since the end of the latest Bahrain business day that has a closed or paid batch.
+    values: [age_seconds]
+    query_ref: settlement_last_batch
+  - metric_name: filspay_settlement_merchants_missing_batch
+    type: gauge
+    help: Active, non-test merchants with no closed or paid batch for the last completed business day.
+    values: [missing]
+    query_ref: settlement_missing_batch
+
+  - metric_name: filspay_payment_links_multi_capture_24h
+    type: gauge
+    help: Payment links with more than one capture in the last 24 hours (FP-205).
+    values: [links]
+    query_ref: multi_capture
+
+queries:
+  # Same filter as the dispatcher's own due query. An inactive endpoint's
+  # deliveries are never attempted, so they aren't a backlog.
+  - query_name: webhook_backlog
+    query: |
+      SELECT count(*) FILTER (WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active') AS due,
+             COALESCE(EXTRACT(EPOCH FROM now() - min(wd.next_attempt_at)
+               FILTER (WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active')), 0) AS oldest_due_age_seconds,
+             count(*) FILTER (WHERE wd.status = 'exhausted' AND wd.last_attempted_at >= now() - interval '24 hours') AS exhausted_24h
+        FROM webhook_deliveries wd
+        JOIN webhook_endpoints we ON we.id = wd.endpoint_id
+
+  # The event types are REPORTING_EVENT_TYPES in
+  # apps/reporting/src/consumer/runConsumerPass.ts; a test keeps them in step.
+  # Receipts decide what was consumed, not the cursor, which is diagnostic.
+  - query_name: reporting_lag
+    query: |
+      SELECT count(*) AS unconsumed,
+             COALESCE(EXTRACT(EPOCH FROM now() - min(oe.created_at)), 0) AS oldest_age_seconds
+        FROM outbox_events oe
+       WHERE oe.event_type IN ('transaction.captured', 'transaction.voided', 'settlement.batch_closed', 'settlement.paid', 'refund.succeeded')
+         AND NOT EXISTS (SELECT 1 FROM reporting_consumed_events r
+                          WHERE r.consumer_name = 'reporting' AND r.outbox_event_id = oe.id)
+
+  - query_name: settlement_last_batch
+    query: |
+      SELECT COALESCE(EXTRACT(EPOCH FROM now() - ((max(batch_date) + 1)::timestamp AT TIME ZONE 'Asia/Bahrain')), 0) AS age_seconds
+        FROM settlement_batches
+       WHERE status IN ('closed', 'paid')
+
+  # The daemon closes a day 15 minutes after Bahrain midnight. Until 01:00 this
+  # still checks the day before, so a normal close never reads as missing.
+  # A merchant is skipped if it was created after that day ended.
+  - query_name: settlement_missing_batch
+    query: |
+      WITH checked AS (
+        SELECT ((now() AT TIME ZONE 'Asia/Bahrain') - interval '1 hour')::date - 1 AS business_date
+      )
+      SELECT count(*) AS missing
+        FROM merchants m, checked c
+       WHERE m.status = 'active'
+         AND m.test_mode = false
+         AND m.created_at < ((c.business_date + 1)::timestamp AT TIME ZONE 'Asia/Bahrain')
+         AND NOT EXISTS (SELECT 1 FROM settlement_batches b
+                          WHERE b.merchant_id = m.id AND b.batch_date = c.business_date
+                            AND b.status IN ('closed', 'paid'))
+
+  # A link keeps one transaction_id, so a repeated capture shows up as extra
+  # capture events on that transaction. The postmortem's query joined on
+  # transactions.payment_link_id, which doesn't exist in this schema.
+  - query_name: multi_capture
+    query: |
+      SELECT count(*) AS links
+        FROM (SELECT pl.id
+                FROM payment_links pl
+                JOIN transaction_events te ON te.transaction_id = pl.transaction_id
+               WHERE te.event_type IN ('captured', 'partially_captured')
+                 AND te.occurred_at >= now() - interval '24 hours'
+               GROUP BY pl.id
+              HAVING count(*) > 1) multi

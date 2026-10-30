@@ -1,0 +1,68 @@
+rule_files:
+  - ../rules/infrastructure.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: PostgresDown waits 2 minutes before firing
+    interval: 30s
+    input_series:
+      - series: 'pg_up{job="postgres"}'
+        values: "0x10"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PostgresDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: PostgresDown
+        exp_alerts:
+          - exp_labels: { severity: page, job: postgres }
+            exp_annotations:
+              summary: The Postgres exporter cannot reach the database
+              runbook: "ops/observability/README.md#postgresdown"
+
+  - name: PostgresDown stays quiet while the database is up
+    interval: 30s
+    input_series:
+      - series: 'pg_up{job="postgres"}'
+        values: "1x10"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PostgresDown
+        exp_alerts: []
+
+  - name: HostDiskLow uses the fuller of the two mount points
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{mountpoint="/"}'
+        values: "10x15"
+      - series: 'node_filesystem_size_bytes{mountpoint="/"}'
+        values: "100x15"
+      - series: 'node_filesystem_avail_bytes{mountpoint="/var/lib/docker"}'
+        values: "90x15"
+      - series: 'node_filesystem_size_bytes{mountpoint="/var/lib/docker"}'
+        values: "100x15"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: HostDiskLow
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations:
+              summary: Under 15% of the host's disk is free
+              runbook: "ops/observability/README.md#hostdisklow"
+
+  - name: PostgresConnectionsNearLimit fires over 80%
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_activity_count{state="active"}'
+        values: "85x15"
+      - series: 'pg_settings_max_connections'
+        values: "100x15"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: PostgresConnectionsNearLimit
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations:
+              summary: Postgres is using over 80% of its connections
+              runbook: "ops/observability/README.md#postgresconnectionsnearlimit"

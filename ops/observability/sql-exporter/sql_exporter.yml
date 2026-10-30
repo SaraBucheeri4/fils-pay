@@ -1,0 +1,16 @@
+# The connection string comes from SQLEXPORTER_TARGET_DSN, so the password
+# stays out of this file. See docker-compose.observability.yml.
+global:
+  scrape_timeout: 10s
+  scrape_timeout_offset: 500ms
+  # Queries run at most once a minute, however often Prometheus scrapes.
+  min_interval: 60s
+  max_connections: 2
+  max_idle_connections: 1
+
+target:
+  data_source_name: postgres://unset
+  collectors: [filspay_business]
+
+collector_files:
+  - /etc/sql-exporter/filspay.collector.yml

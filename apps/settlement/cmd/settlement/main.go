@@ -28,6 +28,7 @@ import (
 	"github.com/filspay/settlement/internal/db"
 	"github.com/filspay/settlement/internal/internalapi"
 	"github.com/filspay/settlement/internal/ledger"
+	"github.com/filspay/settlement/internal/metrics"
 	"github.com/filspay/settlement/internal/scheduler"
 	"github.com/filspay/settlement/internal/settlement"
 )
@@ -86,6 +87,16 @@ func main() {
 				log.Fatalf("settlement daemon: internal api: %v", err)
 			}
 		}()
+
+		// Off unless METRICS_PORT is set. Unlike the internal API, a failure
+		// here is only logged: monitoring must never stop settlement.
+		if cfg.MetricsPort > 0 {
+			go func() {
+				if err := metrics.Serve(ctx, cfg.MetricsPort); err != nil {
+					log.Printf("settlement daemon: metrics: %v", err)
+				}
+			}()
+		}
 
 		// FH: if internalapi fails to bind we log.Fatalf from the goroutine and skip the deferred pool.Close -- ok?
 		scheduler.Run(ctx, pool, cfg)

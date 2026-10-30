@@ -6,6 +6,7 @@ import { cookiesPlugin } from "./plugins/cookies.js";
 import { multipartPlugin } from "./plugins/multipart.js";
 import { errorHandler } from "./plugins/errorHandler.js";
 import { apiDocsPlugin } from "./plugins/apiDocs.js";
+import { metricsPlugin, type ApiMetrics } from "./plugins/metrics.js";
 import { createPostgresRateLimitStore, rateLimitPlugin, type RateLimitStore } from "./plugins/rateLimit.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
@@ -34,6 +35,8 @@ export interface BuildAppOptions {
   webhookTransport?: WebhookTransport;
   /** Where rate-limit counters live. Defaults to Postgres; tests inject one. */
   rateLimitStore?: RateLimitStore;
+  /** Set by index.ts only when METRICS_PORT is set. */
+  metrics?: ApiMetrics;
 }
 
 /**
@@ -50,6 +53,8 @@ export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = 
   app.decorate("acquirer", createAcquirerSimulator(config));
   app.decorate("webhookTransport", options.webhookTransport ?? createFetchTransport());
 
+  // First, so requests any later plugin rejects are still counted.
+  if (options.metrics) app.register(metricsPlugin, { metrics: options.metrics });
   app.register(cookiesPlugin);
   app.register(multipartPlugin, { config });
   app.setErrorHandler(errorHandler);
