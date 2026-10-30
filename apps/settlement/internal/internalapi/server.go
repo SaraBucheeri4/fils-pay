@@ -71,7 +71,7 @@ type runBatchResponse struct {
 
 // rebuildDiffResponse is the JSON projection of ledger.RebuildDiff.
 //
-// After comes from the fast refresh path, not the CLI ledger rebuild (B14).
+// After uses the same authoritative ledger calculation as the CLI.
 type rebuildDiffResponse struct {
 	MerchantID string `json:"merchantId"`
 	Before     int64  `json:"before"`

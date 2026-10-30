@@ -6,6 +6,7 @@ package splits
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,6 +58,15 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
+	// Keep the same merchant -> batch lock order as close and recalculation.
+	var lockMerchant uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT merchant_id FROM settlement_batches WHERE id = $1`, batchID).Scan(&lockMerchant); err != nil {
+		return SplitPayoutResult{}, err
+	}
+	if _, err := tx.Exec(ctx, `SELECT id FROM merchants WHERE id = $1 FOR UPDATE`, lockMerchant); err != nil {
+		return SplitPayoutResult{}, err
+	}
+
 	var parentMerchantID uuid.UUID
 	var status string
 	var netPayout int64
@@ -74,6 +84,10 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 	if status != "closed" {
 		tx.Rollback(ctx) //nolint:errcheck
 		return SplitPayoutResult{BatchID: batchID, ParentMerchantID: parentMerchantID, NotClosed: true}, nil
+	}
+
+	if netPayout < 0 {
+		return SplitPayoutResult{}, fmt.Errorf("negative batch requires approved recovery policy")
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -94,7 +108,7 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 			rows.Close()
 			return SplitPayoutResult{}, err
 		}
-		share := money.ApplyRateFils(money.Fils(netPayout), weightBps)
+		share := money.Fils(0)
 		shares = append(shares, ChildShare{ChildMerchantID: childID, WeightBps: weightBps, AllocatedFils: share})
 	}
 	if err := rows.Err(); err != nil {
@@ -103,6 +117,24 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 	}
 	rows.Close()
 
+	if len(shares) == 0 && netPayout > 0 {
+		return SplitPayoutResult{}, fmt.Errorf("split parent has no payout children")
+	}
+	var weightSum int64
+	for _, share := range shares {
+		weightSum += share.WeightBps
+	}
+	if weightSum != 10000 {
+		return SplitPayoutResult{}, fmt.Errorf("split weights must sum to 10000")
+	}
+	weights := make([]ChildWeight, len(shares))
+	for i, s := range shares {
+		weights[i] = ChildWeight{WeightBps: s.WeightBps}
+	}
+	allocated := ChildShares(money.Fils(netPayout), weights)
+	for i := range shares {
+		shares[i].AllocatedFils = allocated[i]
+	}
 	var totalAllocated money.Fils
 	for _, s := range shares {
 		if s.AllocatedFils <= 0 {
@@ -135,6 +167,10 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 	// for a non-split merchant.
 	// am: should pass netPayout here not totalAllocated, otherwise the cache drifts from the batch
 	if err := balances.ApplyPayout(ctx, tx, parentMerchantID, batchID, totalAllocated); err != nil {
+		return SplitPayoutResult{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE merchants SET lifetime_net_payout_monitoring_estimate = lifetime_net_payout_monitoring_estimate + $2 WHERE id = $1`, parentMerchantID, netPayout); err != nil {
 		return SplitPayoutResult{}, err
 	}
 

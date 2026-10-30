@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/filspay/settlement/internal/config"
+	"github.com/filspay/settlement/internal/ledger"
 	"github.com/filspay/settlement/internal/settlement"
 )
 
@@ -48,7 +49,9 @@ func Run(ctx context.Context, db *pgxpool.Pool, cfg config.Config) {
 	// which CloseBatch/PayoutBatch's own idempotency makes safe to run for
 	// any past date, processed or not.
 	// am: runs on boot before the delay check, so a restart at 00:05 closes early. saw it once
+	lastRefreshDate := ""
 	runIfDue(ctx, db, cfg.DaemonRunDelayMinutes)
+	refreshIfDue(ctx, db, time.Now(), &lastRefreshDate)
 
 	for {
 		select {
@@ -57,6 +60,7 @@ func Run(ctx context.Context, db *pgxpool.Pool, cfg config.Config) {
 			return
 		case <-ticker.C:
 			runIfDue(ctx, db, cfg.DaemonRunDelayMinutes)
+			refreshIfDue(ctx, db, time.Now(), &lastRefreshDate)
 		}
 	}
 }
@@ -76,17 +80,12 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 	// which would make this check permanently unable to hold a run back to
 	// let last-minute transactions settle.
 	// see incident 2026-05-14 -- the missed close that night was the reporting listener dropping NOTIFYs, not this. -- FH
-	now := time.Now().UTC()
-	todayStart, _ := settlement.BusinessDayWindow(now)
-	dueAt := todayStart.Add(time.Duration(runDelayMinutes) * time.Minute)
-	if now.Before(dueAt) {
-		// The grace period after today's Bahrain midnight hasn't elapsed
-		// yet; nothing new to do this tick.
+	now := time.Now()
+	businessDate, due := completedBusinessDay(now, runDelayMinutes)
+	if !due {
 		logNextRunEstimate(now)
 		return
 	}
-	// am: logs show the close ~03:15 local not 00:15?? whatever, it runs. yalla
-	businessDate := todayStart.AddDate(0, 0, -1)
 
 	report, err := settlement.RunDailyBatch(ctx, db, businessDate, nil)
 	if err != nil {
@@ -111,4 +110,30 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 	}
 
 	logNextRunEstimate(now)
+}
+
+// A failed refresh is retried on the next poll. A restart safely recomputes.
+func refreshIfDue(ctx context.Context, db *pgxpool.Pool, now time.Time, lastRefreshDate *string) {
+	date, due := nightlyRefreshDate(now, *lastRefreshDate)
+	if !due {
+		return
+	}
+
+	if _, err := ledger.RefreshBalanceCache(ctx, db); err != nil {
+		log.Printf("settlement daemon: nightly balance refresh failed: %v", err)
+		return
+	}
+	*lastRefreshDate = date
+}
+
+func completedBusinessDay(now time.Time, delayMinutes int) (time.Time, bool) {
+	local := now.In(schedulingLocation())
+	start, _ := settlement.BusinessDayWindow(local)
+	return start.AddDate(0, 0, -1), !now.Before(start.Add(time.Duration(delayMinutes) * time.Minute))
+}
+
+func nightlyRefreshDate(now time.Time, lastDate string) (string, bool) {
+	local := now.In(schedulingLocation())
+	date := local.Format("2006-01-02")
+	return date, local.Hour() >= 2 && date != lastDate
 }

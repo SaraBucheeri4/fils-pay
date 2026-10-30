@@ -10,7 +10,6 @@ package scheduler
 
 import (
 	"log"
-	"os"
 	"time"
 )
 
@@ -22,14 +21,7 @@ import (
 // var of that package and not reachable from here.
 // FH: reads TZ, container has TZ unset, so these log lines say UTC. confusing but log-only
 // MK: DO NOT use this for anything but logs.
-func schedulingLocation() *time.Location {
-	if tz := os.Getenv("TZ"); tz != "" {
-		if loc, err := time.LoadLocation(tz); err == nil {
-			return loc
-		}
-	}
-	return time.Local
-}
+func schedulingLocation() *time.Location { return time.FixedZone("Asia/Bahrain", 3*60*60) }
 
 // estimateNextRunAt gives a rough, log-only estimate of the daemon's next
 // check-in: the last check-in plus 24 hours, in schedulingLocation(). It

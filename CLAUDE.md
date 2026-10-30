@@ -23,9 +23,14 @@ changing the affected behavior. Record an approved change in those sources
 code behavior, passing tests or checklist wording. External finance/provider
 input must be reflected in an approved source update before it changes the rule.
 
-Known document conflicts requiring care include HANDOVER versus ADR-0003 on
-reconciliation months, HANDOVER/ARCHITECTURE versus ADR-0004 on rebuild paths,
-HANDOVER versus ARCHITECTURE on credit posting dates, and HANDOVER versus
+ADR-0007 records the owner's 2026-10-30 approval: Bahrain windows and displayed
+timestamps, ledger-authoritative CLI and console rebuilds, and atomic,
+idempotent per-line residue posting. It supersedes ADR-0003's UTC-month
+exception and ADR-0004's separate console source. Accepted settlement ADR
+implementation is approved; do not ask for that same approval again.
+
+Remaining document conflicts requiring care include HANDOVER versus
+ARCHITECTURE on credit posting dates, and HANDOVER versus
 ADR-0002 on whether residue posting is already implemented. Implementation
 status claims must not be mistaken for proof a requirement is satisfied.
 

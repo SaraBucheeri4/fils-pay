@@ -20,12 +20,27 @@ import (
 // individually, is the one place this logic needs to exist regardless of
 // which of the two paid the batch.
 //
-// The NOT EXISTS read is not protected against concurrent scans; without
-// a unique business-event identity, two invocations can enqueue duplicates (B24).
+// Locked batches and a unique settlement.paid identity serialize concurrent scans.
 func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("settlement: notifications begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	// Paid-batch bookkeeping is independent of subscriber count, retry and replay.
+	// The uniqueness constraint preserves one business record per payout.
+	_, err = tx.Exec(ctx, `
+ INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference)
+ SELECT id, net_payout_fils, 'disb_' || id::text FROM settlement_batches
+ WHERE status = 'paid' AND net_payout_fils > 0
+     ORDER BY id
+ ON CONFLICT (settlement_batch_id) DO NOTHING`)
+	if err != nil {
+		return 0, fmt.Errorf("settlement: payout records: %w", err)
+	}
 	// Ordered by paid_at so notifications go out in payout order. LIMIT 500
 	// bounds one scan; the next tick picks up whatever is left.
-	rows, err := db.Query(ctx, `
+	rows, err := tx.Query(ctx, `
 		SELECT sb.id, sb.merchant_id, sb.batch_date, sb.net_payout_fils
 		  FROM settlement_batches sb
 		 WHERE sb.status = 'paid'
@@ -36,6 +51,7 @@ func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, err
 		   )
 		 ORDER BY sb.paid_at ASC
 		 LIMIT 500
+         FOR UPDATE OF sb SKIP LOCKED
 	`)
 	if err != nil {
 		return 0, fmt.Errorf("settlement: EnqueuePayoutNotifications: select: %w", err)
@@ -61,6 +77,7 @@ func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, err
 	if err := rows.Err(); err != nil {
 		return 0, fmt.Errorf("settlement: EnqueuePayoutNotifications: iterate: %w", err)
 	}
+	rows.Close()
 
 	count := 0
 	for _, b := range batches {
@@ -77,14 +94,18 @@ func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, err
 		if err != nil {
 			return count, fmt.Errorf("settlement: EnqueuePayoutNotifications: marshal payload: %w", err)
 		}
-		_, err = db.Exec(ctx, `
+		inserted, err := tx.Exec(ctx, `
 			INSERT INTO outbox_events (event_type, aggregate_type, aggregate_id, payload)
 			VALUES ('settlement.paid', 'settlement_batch', $1, $2)
+            ON CONFLICT (aggregate_id) WHERE event_type = 'settlement.paid' DO NOTHING
 		`, b.id, payload)
 		if err != nil {
 			return count, fmt.Errorf("settlement: EnqueuePayoutNotifications: insert batch %s: %w", b.id, err)
 		}
-		count++
+		count += int(inserted.RowsAffected())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("settlement: notifications commit: %w", err)
 	}
 	return count, nil
 }

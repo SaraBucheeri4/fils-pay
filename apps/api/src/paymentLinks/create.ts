@@ -1,15 +1,12 @@
 import type { Pool } from "pg";
+import { randomBytes } from "node:crypto";
 import { toFils } from "@filspay/money";
 import { BadRequestError } from "../lib/errors.js";
-import { randomFromAlphabet } from "../lib/random.js";
 import { serializePaymentLink, type PaymentLinkDto, type PaymentLinkRow } from "./serialize.js";
-
-const TOKEN_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 /** 22-char URL-safe token for payment link URLs. */
 function randomPlinkToken(): string {
-  return randomFromAlphabet(TOKEN_ALPHABET, 22);
+  return randomBytes(16).toString("base64url");
 }
 
 export interface CreatePaymentLinkInput {

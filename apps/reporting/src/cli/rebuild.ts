@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import type { ReportingConfig } from "../config.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { resetCursor } from "../consumer/cursor.js";
-import { runConsumerPass, CONSUMER_NAME } from "../consumer/runConsumerPass.js";
+import { applyConsumerBatch, CONSUMER_NAME } from "../consumer/runConsumerPass.js";
+import { readCursor } from "../consumer/cursor.js";
 
 interface RollupCounts {
   volumeRows: number;
@@ -45,19 +46,22 @@ export async function runRebuild(pool: Pool, config: ReportingConfig): Promise<v
     `[reporting/rebuild] before: merchant_daily_volume=${before.volumeRows} rows, merchant_payout_trends=${before.trendRows} rows`,
   );
 
-  // FH: truncate + reset in one tx, replay outside it -- a live worker can race the replay? (MK: worker is stopped during rebuild per RUNBOOK)
+  // Hold the consumer identity through reset and replay; publish one complete snapshot.
+  let totalProcessed = 0;
   await withTransaction(pool, async (client) => {
+    await readCursor(client, CONSUMER_NAME);
+    await client.query(`LOCK TABLE outbox_events IN SHARE MODE`);
     await client.query(`TRUNCATE merchant_daily_volume`);
     await client.query(`TRUNCATE merchant_payout_trends`);
     await resetCursor(client, CONSUMER_NAME);
-  });
+    await client.query(`DELETE FROM reporting_consumed_events WHERE consumer_name = $1`, [CONSUMER_NAME]);
 
-  let totalProcessed = 0;
-  for (;;) {
-    const { processedCount } = await runConsumerPass(pool, config);
-    totalProcessed += processedCount;
-    if (processedCount === 0) break;
-  }
+    for (;;) {
+      const { processedCount } = await applyConsumerBatch(client, config);
+      totalProcessed += processedCount;
+      if (processedCount === 0) break;
+    }
+  });
 
   // TODO: diff against apps/api admin/reportingRebuild.ts output (YA 2026-02)
   const after = await getRollupCounts(pool);

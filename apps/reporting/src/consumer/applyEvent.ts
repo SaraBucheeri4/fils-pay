@@ -144,7 +144,7 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
       `SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1 AND volume_date = $2`,
       [payload.merchantId, payload.batchDate],
     );
-    const rollup = rollupResult.rows[0] as { captured_count: number };
+    const rollup = (rollupResult.rows[0] ?? { captured_count: 0 }) as { captured_count: number };
     if (rollup.captured_count < groundTruthCount) {
       console.warn(
         `reporting rollup lags ground truth for merchant ${payload.merchantId} on ${payload.batchDate}: ` +
@@ -167,7 +167,7 @@ export async function applyDailySummaryRollup(
   occurredAt: Date,
   amountFils: number,
 ): Promise<void> {
-  const summaryDate = occurredAt.toISOString().slice(0, 10);
+  const summaryDate = toBahrainDateString(occurredAt);
   await client.query(
     `INSERT INTO merchant_daily_volume (merchant_id, volume_date, refund_count, refund_gross_fils, last_updated_at)
      VALUES ($1, $2, 1, $3, now())
@@ -190,12 +190,30 @@ export async function applyDailySummaryRollup(
  */
 export async function applyEvent(client: PoolClient, row: OutboxEventRow): Promise<void> {
   switch (row.event_type) {
+    case "refund.succeeded": {
+      const payload = row.payload as { merchantId: string; amountFils: number };
+      return applyDailySummaryRollup(client, payload.merchantId, row.created_at, payload.amountFils);
+    }
     case "transaction.captured":
       return applyTransactionCaptured(client, row);
     case "transaction.voided":
       return applyTransactionVoided(client, row);
     case "settlement.batch_closed":
       return applyBatchClosed(client, row);
+    case "settlement.paid": {
+      const batchId = row.payload.batchId ?? row.aggregate_id;
+      await client.query(
+        `INSERT INTO merchant_payout_trends
+          (merchant_id, settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at, last_updated_at)
+         SELECT merchant_id, id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at, now()
+         FROM settlement_batches WHERE id = $1
+         ON CONFLICT (merchant_id, settlement_batch_id) DO UPDATE
+         SET status = EXCLUDED.status, paid_at = EXCLUDED.paid_at,
+             gross_fils = EXCLUDED.gross_fils, fee_fils = EXCLUDED.fee_fils,
+             net_payout_fils = EXCLUDED.net_payout_fils, last_updated_at = now()`, [batchId],
+      );
+      return;
+    }
     default:
       throw new Error(`applyEvent: unhandled event_type ${row.event_type}`);
   }

@@ -19,7 +19,7 @@ const REFUNDABLE_STATUSES = new Set(["captured", "partially_captured", "partiall
 
 /** How much this transaction may still return. */
 export function refundableAmount(txn: RefundableTransaction): Fils {
-  return txn.refundableFils;
+  return compareFils(txn.refundableFils, txn.capturedFils) > 0 ? txn.capturedFils : txn.refundableFils;
 }
 
 /** Decides whether `requestedAmountFils` may be refunded against `txn`. */

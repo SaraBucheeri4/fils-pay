@@ -44,6 +44,7 @@ async function recordCaptureMetric(
 const ENDPOINT = "transactions.capture";
 
 export interface CaptureInput {
+  paymentLinkClaim?: { linkId: string; reservationId: string };
   transactionId: string;
   merchantId: string;
   amountFils?: Fils; // omitted => capture the full remaining amount
@@ -89,7 +90,7 @@ export async function captureTransaction(
   acquirer: AcquirerSimulator,
   input: CaptureInput,
 ): Promise<CaptureResult> {
-  const requestHash = hashRequest({ amountFils: input.amountFils ?? null });
+  const requestHash = hashRequest({ transactionId: input.transactionId, amountFils: input.amountFils ?? null });
 
   return withTransaction(pool, async (client) => {
     const claim = await claimIdempotencyKey(client, {
@@ -110,6 +111,18 @@ export async function captureTransaction(
       return { statusCode: claim.row.responseStatusCode ?? 200, body: claim.row.responseBody };
     }
     // 'fresh' / 'retry_after_failure' — continue.
+
+    if (input.paymentLinkClaim) {
+      const link = await client.query(
+        `SELECT id FROM payment_links WHERE id = $1 AND merchant_id = $2
+          AND status = 'reserved' AND reservation_id = $3 FOR UPDATE`,
+        [input.paymentLinkClaim.linkId, input.merchantId, input.paymentLinkClaim.reservationId]);
+      if (!link.rows[0]) {
+        const body = { error: "payment_link_attempt_superseded" };
+        await completeIdempotencyKey(client, claim.row.id, { statusCode: 409, body });
+        return { statusCode: 409, body };
+      }
+    }
 
     // Acquire the row lock FIRST, before any validation. Ownership is
     // enforced by input.merchantId, which the caller derives only from
@@ -150,8 +163,8 @@ export async function captureTransaction(
       return { statusCode: 422, body };
     }
 
-    const merchantResult = await client.query<{ mdr_bps: number }>(
-      `SELECT mdr_bps FROM merchants WHERE id = $1`,
+    const merchantResult = await client.query<{ mdr_bps: number; negotiated_discount_bps: number; capture_at: Date }>(
+      `SELECT mdr_bps, negotiated_discount_bps, now() AS capture_at FROM merchants WHERE id = $1`,
       [input.merchantId],
     );
     const merchant = merchantResult.rows[0];
@@ -164,8 +177,11 @@ export async function captureTransaction(
     // applies yet — the ordinary case for every merchant that has never had
     // a negotiated rate change recorded. Resolved at the instant of capture,
     // inside the same locked transaction that computes and journals the fee.
-    const effectiveMdrBps = await getEffectiveMdrBps(client, input.merchantId, new Date(), merchant.mdr_bps);
+    const effectiveMdrBps = await getEffectiveMdrBps(client, input.merchantId, merchant.capture_at, merchant.mdr_bps);
     const volumeTierBonusBps = await getVolumeTierBonusBps(client);
+
+    const discountedAmount = subtractFils(requestedAmount, applyRateFils(requestedAmount, merchant.negotiated_discount_bps));
+    const feeFils = applyRateFils(discountedAmount, Math.max(0, effectiveMdrBps - volumeTierBonusBps));
 
     // Call the acquirer — awaited here, with the row lock from above still
     // held (same client, same open transaction). No other process can
@@ -174,7 +190,7 @@ export async function captureTransaction(
     const acquirerResult = await acquirer.capture({
       acquirerReference: txn.acquirer_reference,
       amountFils: requestedAmount,
-      idempotencyKey: `${claim.row.id}:${claim.row.attemptCount}`,
+      idempotencyKey: hashRequest({ merchantId: input.merchantId, endpoint: ENDPOINT, key: input.idempotencyKey, transactionId: input.transactionId }),
     });
 
     if (acquirerResult.outcome === "declined") {
@@ -193,7 +209,6 @@ export async function captureTransaction(
 
     // outcome === 'approved'. Integer math throughout — no float ever
     // enters this path.
-    const feeFils = applyRateFils(requestedAmount, Math.max(0, effectiveMdrBps - volumeTierBonusBps));
     const newCapturedFils = addFils(capturedSoFar, requestedAmount);
     const newStatus = compareFils(newCapturedFils, amountAuthorized) === 0 ? "captured" : "partially_captured";
 
@@ -255,8 +270,14 @@ export async function captureTransaction(
       eventType: newStatus === "captured" ? "captured" : "partially_captured",
       amountFils: requestedAmount,
       actor: input.actor,
-      metadata: { feeFils, acquirerReference: acquirerResult.acquirerReference },
+      metadata: { entryGroupId, feeFils, pricingVersion: "discount-before-mdr", effectiveMdrBps, volumeTierBonusBps, discountBps: merchant.negotiated_discount_bps, acquirerReference: acquirerResult.acquirerReference },
     });
+
+    if (input.paymentLinkClaim) {
+      await client.query(`UPDATE payment_links SET status = 'paid', paid_at = now(), transaction_id = $2,
+        reserved_at = NULL WHERE id = $1 AND reservation_id = $3`,
+        [input.paymentLinkClaim.linkId, txn.id, input.paymentLinkClaim.reservationId]);
+    }
 
     const body = serializeTransaction(updatedTxn);
     await completeIdempotencyKey(client, claim.row.id, { statusCode: 200, body, resourceId: txn.id });

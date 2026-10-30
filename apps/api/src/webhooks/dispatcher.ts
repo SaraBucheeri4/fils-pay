@@ -3,9 +3,9 @@ import { Client, type Pool } from "pg";
 import type { Config } from "../config.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { decodeEncryptionKey, decryptSecret } from "./secretCrypto.js";
-import { signPayload } from "./sign.js";
+import { signRawPayload } from "./sign.js";
+import { canonicalJson } from "../payments/idempotency.js";
 import { buildEnvelope } from "./envelope.js";
-import { recordPayoutDisbursementEffect } from "./payoutDisbursement.js";
 import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_SIGNATURE_HEADER } from "./headers.js";
 import type { WebhookTransport } from "./transport.js";
 
@@ -28,17 +28,9 @@ const WEBHOOK_ELIGIBLE_EVENT_TYPES: readonly string[] = [
   "transaction.captured",
   "transaction.voided",
   "settlement.paid",
+  "refund.succeeded",
 ];
 const NOTIFY_CHANNEL = "outbox_events_channel";
-
-type PreDeliveryEffect = (pool: Pool, payload: Record<string, unknown>) => Promise<void>;
-
-const PRE_DELIVERY_EFFECTS: Record<string, PreDeliveryEffect> = {
-  "settlement.paid": async (pool, payload) => {
-    const data = payload.data as { settlementBatchId: string; netPayoutFils: number };
-    await recordPayoutDisbursementEffect(pool, data.settlementBatchId, Number(data.netPayoutFils));
-  },
-};
 
 export type DispatcherConfig = Pick<
   Config,
@@ -147,19 +139,15 @@ interface DueDeliveryRow {
  * DB transaction open.
  */
 async function attemptOneDelivery(
-  pool: Pool,
+  pool: Pick<Pool, "query">,
   transport: WebhookTransport,
   config: DispatcherConfig,
   row: DueDeliveryRow,
 ): Promise<void> {
   const key = decodeEncryptionKey(config.webhookSecretEncryptionKey);
   const secret = decryptSecret(row.secret_ciphertext, key);
-  const { signature } = signPayload(row.payload, secret);
-
-  if (row.attempt_count === 0) {
-    const effect = PRE_DELIVERY_EFFECTS[row.event_type];
-    if (effect) await effect(pool, row.payload);
-  }
+  const body = canonicalJson(row.payload);
+  const { signature } = signRawPayload(body, secret);
 
   const result = await transport({
     url: row.url,
@@ -168,7 +156,7 @@ async function attemptOneDelivery(
       [WEBHOOK_DELIVERY_ID_HEADER]: row.delivery_event_id,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(row.payload),
+    body,
     timeoutMs: config.webhookRequestTimeoutMs,
   });
 
@@ -213,21 +201,35 @@ async function attemptOneDelivery(
 }
 
 /** Step B: attempt every currently-due 'pending' delivery, sequentially. */
-// MK: no SKIP LOCKED — only ever run ONE api replica until this changes
+// Session advisory claims span HTTP without holding a database transaction open.
 async function attemptDueDeliveries(pool: Pool, transport: WebhookTransport, config: DispatcherConfig): Promise<number> {
   const dueResult = await pool.query<DueDeliveryRow>(
     `SELECT wd.id, wd.endpoint_id, wd.event_type, wd.delivery_event_id, wd.payload, wd.attempt_count, we.url, we.secret_ciphertext
        FROM webhook_deliveries wd
        JOIN webhook_endpoints we ON we.id = wd.endpoint_id
-      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now()
+      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active'
       ORDER BY wd.next_attempt_at ASC
       LIMIT $1`,
     [STEP_B_BATCH_LIMIT],
   );
 
   for (const row of dueResult.rows) {
+    const client = await pool.connect();
+    let locked = false;
     try {
-      await attemptOneDelivery(pool, transport, config, row);
+      const claim = await client.query<{ locked: boolean }>(
+        `SELECT pg_try_advisory_lock(hashtextextended($1, 8400)) AS locked`, [row.id],
+      );
+      locked = claim.rows[0]!.locked;
+      if (!locked) continue;
+      // The initial scan is only a candidate list; another worker may have
+      // completed this row before we acquired its connection-scoped claim.
+      const current = await client.query<DueDeliveryRow>(
+        `SELECT wd.id, wd.endpoint_id, wd.event_type, wd.delivery_event_id, wd.payload, wd.attempt_count, we.url, we.secret_ciphertext
+         FROM webhook_deliveries wd JOIN webhook_endpoints we ON we.id = wd.endpoint_id
+         WHERE wd.id = $1 AND wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active'`, [row.id],
+      );
+      if (current.rows[0]) await attemptOneDelivery(client, transport, config, current.rows[0]);
     } catch (err: unknown) {
       // A single row throwing before/around the transport call (e.g. a
       // secret that fails to decrypt under the current
@@ -243,6 +245,13 @@ async function attemptDueDeliveries(pool: Pool, transport: WebhookTransport, con
         "[webhooks/dispatcher] delivery attempt threw before/around transport call, skipping row for this pass",
         { deliveryId: row.id, endpointId: row.endpoint_id, err },
       );
+    } finally {
+      try {
+        if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended($1, 8400))`, [row.id]);
+        client.release();
+      } catch (error) {
+        client.release(error instanceof Error ? error : new Error(String(error)));
+      }
     }
   }
   return dueResult.rows.length;

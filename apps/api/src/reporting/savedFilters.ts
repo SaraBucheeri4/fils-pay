@@ -1,4 +1,6 @@
 import type { Pool } from "pg";
+import { withTransaction } from "../db/withTransaction.js";
+import { ConflictError } from "../lib/errors.js";
 
 export interface SavedFilterDto {
   id: string;
@@ -31,24 +33,31 @@ export async function createSavedFilter(
   pool: Pool,
   input: { merchantId: string; name: string; filter: Record<string, unknown> },
 ): Promise<SavedFilterDto> {
-  const result = await pool.query<SavedFilterRow>(
-    `INSERT INTO reporting_saved_filters (merchant_id, name, filter_json)
-     VALUES ($1, $2, $3::jsonb)
-     RETURNING id, name, filter_json, created_at`,
-    [input.merchantId, input.name, JSON.stringify(input.filter)],
-  );
-  return serialize(result.rows[0]!);
+  return withTransaction(pool, async (client) => {
+    await client.query(`SELECT id FROM merchants WHERE id = $1 FOR UPDATE`, [input.merchantId]);
+    const count = await client.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM reporting_saved_filters WHERE merchant_id = $1`, [input.merchantId],
+    );
+    if (Number(count.rows[0]!.count) >= 50) throw new ConflictError("saved_filter_limit_reached");
+    const result = await client.query<SavedFilterRow>(
+      `INSERT INTO reporting_saved_filters (merchant_id, name, filter_json)
+       VALUES ($1, $2, $3::jsonb)
+       RETURNING id, name, filter_json, created_at`,
+      [input.merchantId, input.name, JSON.stringify(input.filter)],
+    );
+    return serialize(result.rows[0]!);
+  });
 }
 
 /**
  * Lists a merchant's saved filters, newest first, scoped by merchant_id.
- * No quota or pagination is currently enforced (B86).
+ * At most 50 filters are returned; writes enforce the same per-merchant quota.
  */
 export async function listSavedFilters(pool: Pool, input: { merchantId: string }): Promise<SavedFilterDto[]> {
   const result = await pool.query<SavedFilterRow>(
     `SELECT id, name, filter_json, created_at FROM reporting_saved_filters
       WHERE merchant_id = $1
-      ORDER BY created_at DESC`,
+      ORDER BY created_at DESC LIMIT 50`,
     [input.merchantId],
   );
   return result.rows.map(serialize);

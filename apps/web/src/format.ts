@@ -8,7 +8,7 @@ import { formatBhd, toFils } from "@filspay/money";
  */
 // FH: toFils without allowNegative throws on a negative — refund events / negative gaps crash the page?
 export function bhd(amountFils: number): string {
-  return `${formatBhd(toFils(amountFils))} BHD`;
+  return `${formatBhd(toFils(amountFils, { allowNegative: true }))} BHD`;
 }
 
 /** `—` for a null/absent value, so an empty table cell is visibly empty
@@ -17,22 +17,14 @@ export function dash(value: string | number | null | undefined): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
-/** Browser-local rendering, not Asia/Bahrain. */
+/** Bahrain display time, independent of the browser timezone. */
 export function dateTime(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Bahrain" }) : "—";
 }
 
-/**
- * An `<input type="date">` value (YYYY-MM-DD) as a full ISO instant at the
- * UTC day boundary — what the `from`/`to` transaction filters take. No
- * timezone picker and no business-day conversion: those filters compare
- * `occurred_at` directly, so pretending otherwise here would invent a
- * precision the endpoint doesn't have.
- */
-// YA: UTC day boundary, NOT Bahrain. filters are 3h off vs settlement days. known.
-// fixed, uses bahrain time now — am
+/** A date input is a Bahrain business date, serialized as an absolute instant. */
 export function dayStartIso(dateValue: string): string | undefined {
-  return dateValue ? `${dateValue}T00:00:00.000Z` : undefined;
+  return dateValue ? new Date(`${dateValue}T00:00:00.000+03:00`).toISOString() : undefined;
 }
 
 /**
@@ -42,6 +34,6 @@ export function dayStartIso(dateValue: string): string | undefined {
  */
 export function localDateTimeToIso(value: string): string | null {
   if (!value) return null;
-  const parsed = new Date(value);
+  const parsed = new Date(`${value}+03:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }

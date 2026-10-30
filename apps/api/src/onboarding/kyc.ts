@@ -13,7 +13,7 @@ export type KycDocumentType = "commercial_registration" | "owner_id" | "proof_of
 /** Document types the registry/bank issues as a PDF, never as a photo. */
 const PDF_ONLY_DOCUMENT_TYPES: readonly KycDocumentType[] = ["commercial_registration", "bank_letter"];
 
-/** @property fileName Currently used by PDF-extension validation (B81). */
+/** @property fileName Display metadata only; content validation uses detected bytes. */
 export interface RecordKycDocumentInput {
   merchantId: string;
   documentType: KycDocumentType;
@@ -33,8 +33,7 @@ export interface RecordKycDocumentResult {
 }
 
 /**
- * Detects the broad file type from bytes, but PDF-only narrowing still uses
- * the client filename (B81). Writes it to disk under
+ * Detects and enforces the document-specific file type from bytes. Writes it under
  * `config.kycUploadDir/<merchantId>/<sha256>.<ext>`, and records it — moving
  * onboarding_status to 'under_review' as a side effect of "documents are
  * now in the queue," never touching kyc_passed.
@@ -50,8 +49,7 @@ export async function recordKycDocument(
     throw new UnprocessableEntityError("invalid_file_type");
   }
 
-  // Filename-only narrowing does not prove the detected type is PDF (B81).
-  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")) {
+  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && detected !== "pdf") {
     throw new UnprocessableEntityError("document_must_be_pdf", "commercial_registration and bank_letter documents must be a PDF");
   }
 

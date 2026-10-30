@@ -1,11 +1,7 @@
-/** Estimated fee for a single capture, using float basis-point rates. */
-export function estimateFeeFils(
-  amountFils: number,
-  mdrBps: number,
-  discountBps: number,
-): number {
-  const mdrRate = mdrBps / 10_000;
-  const discountRate = discountBps / 10_000;
-  const feeBeforeDiscount = amountFils * mdrRate;
-  return Math.round(feeBeforeDiscount - feeBeforeDiscount * discountRate);
+import { applyRateFils, subtractFils, toFils } from "@filspay/money";
+
+/** Architecture: discount the capture amount before applying MDR. */
+export function estimateFeeFils(amountFils: number, mdrBps: number, discountBps: number): number {
+ const amount = toFils(amountFils);
+ return applyRateFils(subtractFils(amount, applyRateFils(amount, discountBps)), mdrBps);
 }

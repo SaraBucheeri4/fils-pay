@@ -1,48 +1,34 @@
-// Package balances maintains merchant_balances — a cache of each
-// merchant's settlement-batch-driven payable balance, maintained
-// incrementally by apps/settlement at batch close/payout time. It is a CACHE, not a second source of
-// truth: ledger_entries remains authoritative (see internal/ledger for the
-// full, authoritative recompute).
-// -- M? (Jan 2026): cache only. anything that 'corrects' a balance has to go through ledger_entries or the next rebuild undoes it.
-// am: support adjusts via the cache directly and its been fine for months
+// Package balances refreshes the ledger-authoritative payable cache after
+// settlement operations. ADR-0006 display corrections remain cache-only.
 package balances
 
 import (
 	"context"
-
+	"github.com/filspay/settlement/internal/money"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-
-	"github.com/filspay/settlement/internal/money"
 )
 
-// ApplyBatchClose is called once, inside CloseBatch's own transaction,
-// immediately after a batch's net_payout_fils is computed. It does not
-// touch ledger_entries — it applies the exact, already-known delta this
-// same transaction is about to make true.
-// FH: RecalculateMDR also calls this with a negative delta -- ok on a PAID batch? that payout already went out
-// MK: yes that's the point, the cache reflects the new fee. fine.
-func ApplyBatchClose(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID, netPayoutFils money.Fils) error {
-	_, err := tx.Exec(ctx, `
-		INSERT INTO merchant_balances (merchant_id, cached_payable_fils, last_settlement_batch_id, updated_at)
-		VALUES ($1, $2, $3, now())
-		ON CONFLICT (merchant_id) DO UPDATE
-		  SET cached_payable_fils = merchant_balances.cached_payable_fils + $2,
-		      last_settlement_batch_id = $3,
-		      updated_at = now()
-	`, merchantID, int64(netPayoutFils), batchID)
-	return err
+func ApplyBatchClose(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID, _ money.Fils) error {
+	return refresh(ctx, tx, merchantID, batchID)
 }
 
-// ApplyPayout is called once, inside PayoutBatch's own transaction,
-// applying the negation of the same delta ApplyBatchClose applied at close
-// time.
-// am: if the row is missing this UPDATE no-ops and the payout never leaves the cache. happens for split children
-func ApplyPayout(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID, netPayoutFils money.Fils) error {
-	_, err := tx.Exec(ctx, `
-		UPDATE merchant_balances
-		   SET cached_payable_fils = cached_payable_fils - $2, updated_at = now()
-		 WHERE merchant_id = $1
-	`, merchantID, int64(netPayoutFils))
+func ApplyPayout(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID, _ money.Fils) error {
+	return refresh(ctx, tx, merchantID, batchID)
+}
+
+func refresh(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO merchant_balances (merchant_id, cached_payable_fils)
+   VALUES ($1, 0) ON CONFLICT DO NOTHING`, merchantID); err != nil {
+		return err
+	}
+	var ignored int64
+	if err := tx.QueryRow(ctx, `SELECT cached_payable_fils FROM merchant_balances WHERE merchant_id = $1 FOR UPDATE`, merchantID).Scan(&ignored); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `UPDATE merchant_balances SET cached_payable_fils = (
+   SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
+   FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'),
+   last_settlement_batch_id = $2, updated_at = now() WHERE merchant_id = $1`, merchantID, batchID)
 	return err
 }

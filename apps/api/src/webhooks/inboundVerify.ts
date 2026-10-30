@@ -1,4 +1,5 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { timingSafeEqualHex } from "../lib/crypto.js";
 
 /** Verifies the signature on an inbound acquirer callback. */
 
@@ -29,8 +30,8 @@ function parseAcquirerSignatureHeader(header: string): ParsedAcquirerSignatureHe
   return { timestamp, signature };
 }
 
-/** There is no timestamp reason: freshness is not checked for inbound callbacks. */
-export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch";
+/** Authentication and freshness failures are distinguished for diagnostics. */
+export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch" | "timestamp_out_of_tolerance";
 
 export interface VerifyAcquirerCallbackResult {
   valid: boolean;
@@ -38,21 +39,20 @@ export interface VerifyAcquirerCallbackResult {
 }
 
 function constantTimeEquals(a: string, b: string): boolean {
-  return Buffer.from(a).length === Buffer.from(b).length &&
-    Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
+  return timingSafeEqualHex(a, b);
 }
 
-/** Verifies the acquirer callback signature when present and required. */
+/** Requires a current signature; the legacy optional-signature argument is ignored. */
 export function verifyAcquirerCallbackSignature(
   payload: unknown,
   header: string | undefined,
   secret: string,
-  requireSignature = false,
+  _requireSignature = true,
 ): VerifyAcquirerCallbackResult {
-  if (!header) {
-    return requireSignature
-      ? { valid: false, reason: "malformed_header" }
-      : { valid: true };
+  // This value was committed publicly; never accept it again, including after rollback.
+  const retired = "63889b3971febcfcdfe8d4bc9a17e67b719c00e47b2c1fc74eb7aa8a50ec6306";
+  if (!header || !secret || createHash("sha256").update(secret).digest("hex") === retired) {
+    return { valid: false, reason: "malformed_header" };
   }
 
   const parsed = parseAcquirerSignatureHeader(header);
@@ -64,6 +64,10 @@ export function verifyAcquirerCallbackSignature(
 
   if (!constantTimeEquals(expected, parsed.signature)) {
     return { valid: false, reason: "signature_mismatch" };
+  }
+
+  if (!Number.isSafeInteger(parsed.timestamp) || Math.abs(Math.floor(Date.now() / 1000) - parsed.timestamp) > 300) {
+    return { valid: false, reason: "timestamp_out_of_tolerance" };
   }
 
   return { valid: true };

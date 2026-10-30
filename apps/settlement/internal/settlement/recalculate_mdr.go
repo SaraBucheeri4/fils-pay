@@ -53,10 +53,24 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	var mdrBps, discountBps int64
-	err = tx.QueryRow(ctx, `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`, merchantID).
+	err = tx.QueryRow(ctx, `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1 FOR UPDATE`, merchantID).
 		Scan(&mdrBps, &discountBps)
 	if err != nil {
 		return RecalcResult{}, fmt.Errorf("settlement: RecalculateMDR: load merchant: %w", err)
+	}
+
+	schedules, err := LoadFeeSchedules(ctx, tx, merchantID)
+	if err != nil {
+		return RecalcResult{}, err
+	}
+	mdrBps = EffectiveMdrBpsAt(schedules, time.Now(), mdrBps)
+	platformVolume, err := ReadAndLockPlatformProcessedFils(ctx, tx)
+	if err != nil {
+		return RecalcResult{}, err
+	}
+	mdrBps -= VolumeTierMdrBonusBps(platformVolume)
+	if mdrBps < 0 {
+		mdrBps = 0
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -95,20 +109,24 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 		if err != nil {
 			return RecalcResult{}, err
 		}
-		diff := newFee - b.feeFils
+		var refundFees, appliedCorrections, priorCorrections int64
+		if err := tx.QueryRow(ctx, `SELECT
+          (SELECT COALESCE(SUM(fee_reversed_fils),0) FROM refunds WHERE settlement_batch_id = $1 AND status = 'succeeded'),
+          (SELECT COALESCE(SUM(fee_delta_fils),0) FROM settlement_fee_corrections WHERE settlement_batch_id = $1),
+          (SELECT COALESCE(SUM(fee_delta_fils),0) FROM settlement_fee_corrections WHERE source_batch_id = $1)`, b.id).Scan(&refundFees, &appliedCorrections, &priorCorrections); err != nil {
+			return RecalcResult{}, err
+		}
+		oldFee := b.feeFils + money.Fils(refundFees) - money.Fils(appliedCorrections) + money.Fils(priorCorrections)
+		diff := newFee - oldFee
 		if diff == 0 {
 			continue
 		}
-		newNetPayout := b.grossFils - newFee
-		// This still targets the historical batch; paid-history handling is tracked in B28.
+		// Frozen batches remain unchanged. The correction is a new journal
+		// and a durable claim for a later settlement pass.
 		if err := postMdrAdjustment(ctx, tx, merchantID, b.id, diff); err != nil {
 			return RecalcResult{}, err
 		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE settlement_batches SET fee_fils = $2, net_payout_fils = $3 WHERE id = $1
-		`, b.id, int64(newFee), int64(newNetPayout)); err != nil {
-			return RecalcResult{}, fmt.Errorf("settlement: RecalculateMDR: update batch %s: %w", b.id, err)
-		}
+
 		// A fee increase (diff > 0) reduces net payout owed, so the cache
 		// moves by -diff — the same signed-delta idiom ApplyBatchClose
 		// already exposes for a batch close's own net payout.
@@ -119,7 +137,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 			BatchID:    b.id,
 			BatchDate:  b.batchDate,
 			Status:     b.status,
-			OldFeeFils: b.feeFils,
+			OldFeeFils: oldFee,
 			NewFeeFils: newFee,
 			DiffFils:   diff,
 		})
@@ -138,7 +156,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 // CloseBatch would have produced at today's rate.
 func recomputeBatchFee(ctx context.Context, tx pgx.Tx, batchID uuid.UUID, mdrBps, discountBps int64) (money.Fils, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT amount_fils FROM transaction_events WHERE settlement_batch_id = $1 ORDER BY id
+		SELECT amount_fils FROM transaction_events WHERE settlement_batch_id = $1 AND event_type IN ('captured', 'partially_captured') ORDER BY id
 	`, batchID)
 	if err != nil {
 		return 0, fmt.Errorf("settlement: RecalculateMDR: select batch events for %s: %w", batchID, err)
@@ -167,8 +185,7 @@ func recomputeBatchFee(ctx context.Context, tx pgx.Tx, batchID uuid.UUID, mdrBps
 // CHECK (amount_fils > 0), so the magnitude is always posted positive and
 // the sign is carried by which account is debited.
 //
-// Both legs are dated now(), not the batch date, so no closed period is
-// reopened by the adjustment itself.
+// Both legs use the corrected period's Bahrain effective date, per ARCHITECTURE.
 func postMdrAdjustment(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.UUID, diff money.Fils) error {
 	if diff == 0 {
 		return nil
@@ -183,15 +200,23 @@ func postMdrAdjustment(ctx context.Context, tx pgx.Tx, merchantID, batchID uuid.
 		debitAccount, creditAccount = "platform_fee_revenue", "merchant_payable"
 	}
 
+	groupID := uuid.New()
+
 	_, err := tx.Exec(ctx, `
 		INSERT INTO ledger_entries
 		  (entry_group_id, merchant_id, settlement_batch_id, account_id, direction, amount_fils, occurred_at, description)
 		VALUES
-		  ($1, $2, $3, $4, 'debit',  $6, now(), 'MDR recalculation adjustment'),
-		  ($1, $2, $3, $5, 'credit', $6, now(), 'MDR recalculation adjustment')
-	`, uuid.New(), merchantID, batchID, debitAccount, creditAccount, int64(magnitude))
+		  ($1, $2, $3, $4, 'debit',  $6, (SELECT batch_date::timestamp AT TIME ZONE 'Asia/Bahrain' FROM settlement_batches WHERE id = $3), 'MDR recalculation adjustment'),
+          ($1, $2, $3, $5, 'credit', $6, (SELECT batch_date::timestamp AT TIME ZONE 'Asia/Bahrain' FROM settlement_batches WHERE id = $3), 'MDR recalculation adjustment')
+	`, groupID, merchantID, batchID, debitAccount, creditAccount, int64(magnitude))
 	if err != nil {
 		return fmt.Errorf("settlement: RecalculateMDR: post adjustment for batch %s: %w", batchID, err)
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO settlement_fee_corrections
+        (merchant_id, source_batch_id, entry_group_id, fee_delta_fils, settlement_batch_id)
+        SELECT $1, $2, $3, $4, NULL FROM settlement_batches WHERE id = $2`, merchantID, batchID, groupID, int64(diff))
+	if err != nil {
+		return err
 	}
 	return nil
 }

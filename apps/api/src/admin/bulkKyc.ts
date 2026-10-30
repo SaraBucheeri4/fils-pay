@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import { insertAdminAuditLog } from "../adminAudit/log.js";
 import { withTransaction } from "../db/withTransaction.js";
+import { ConflictError } from "../lib/errors.js";
+import { recordKycReviewInTx } from "../onboarding/review.js";
 
 export interface BulkApproveMerchantsKycInput {
   merchantIds: string[];
@@ -9,8 +11,7 @@ export interface BulkApproveMerchantsKycInput {
 }
 
 /**
- * @property approvedMerchantIds IDs returned by the bulk update. The query
- * does not currently filter prior review status or write individual reviews (B85).
+ * @property approvedMerchantIds IDs atomically approved with individual review evidence.
  */
 export interface BulkApproveMerchantsKycResult {
   approvedCount: number;
@@ -23,13 +24,26 @@ export async function bulkApproveMerchantsKyc(
   input: BulkApproveMerchantsKycInput,
 ): Promise<BulkApproveMerchantsKycResult> {
   return withTransaction(pool, async (client) => {
-    const result = await client.query<{ id: string }>(
-      `UPDATE merchants
-          SET onboarding_status = 'approved', kyc_passed = true
-        WHERE id = ANY($1::uuid[])
-      RETURNING id`,
-      [input.merchantIds],
+    const ids = [...new Set(input.merchantIds)].sort();
+    const result = await client.query<{ id: string; onboarding_status: string }>(
+      `SELECT id, onboarding_status FROM merchants WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
+      [ids],
     );
+    if (result.rows.length !== ids.length || result.rows.some((row) => row.onboarding_status !== "under_review")) {
+      throw new ConflictError("invalid_kyc_transition", "Every selected merchant must be under_review");
+    }
+    const admin = await client.query<{ email: string }>(`SELECT email FROM admin_users WHERE id = $1 AND status = 'active'`, [input.adminUserId]);
+    if (!admin.rows[0]) throw new ConflictError("invalid_reviewer");
+    for (const row of result.rows) {
+      await recordKycReviewInTx(client, {
+        merchantId: row.id, outcome: "approved", reviewerIdentifier: admin.rows[0].email,
+        reviewerAdminUserId: input.adminUserId, notes: input.notes,
+      });
+      await insertAdminAuditLog(client, {
+        adminUserId: input.adminUserId, action: "kyc_review", targetType: "merchant", targetId: row.id,
+        metadata: { from: "under_review", to: "approved", bulk: true, notes: input.notes ?? null },
+      });
+    }
     const approvedMerchantIds = result.rows.map((row) => row.id);
 
     await insertAdminAuditLog(client, {

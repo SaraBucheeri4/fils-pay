@@ -1,10 +1,14 @@
 import sharp from "sharp";
 import type { DetectedFileType } from "./fileSignature.js";
+import { TooManyRequestsError, UnprocessableEntityError } from "../lib/errors.js";
 
 /**
  * Longest side, in pixels.
  */
 const THUMBNAIL_MAX_DIMENSION_PX = 320;
+// At most 16 MB of RGBA source pixels per decode, before decoder overhead.
+export const KYC_MAX_INPUT_PIXELS = 4_000_000;
+let activeDecodes = 0;
 
 export interface GeneratedThumbnail {
   buffer: Buffer;
@@ -27,9 +31,17 @@ export async function generateKycThumbnail(
   if (detectedType !== "jpeg" && detectedType !== "png") {
     return null;
   }
-  const resized = await sharp(buffer)
-    .resize(THUMBNAIL_MAX_DIMENSION_PX, THUMBNAIL_MAX_DIMENSION_PX, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 70 })
-    .toBuffer();
-  return { buffer: resized, mimeType: "image/jpeg" };
+  if (activeDecodes >= 2) throw new TooManyRequestsError("kyc_decoder_busy");
+  activeDecodes++;
+  try {
+    const resized = await sharp(buffer, { limitInputPixels: KYC_MAX_INPUT_PIXELS, sequentialRead: true })
+      .resize(THUMBNAIL_MAX_DIMENSION_PX, THUMBNAIL_MAX_DIMENSION_PX, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 70 })
+      .toBuffer();
+    return { buffer: resized, mimeType: "image/jpeg" };
+  } catch {
+    throw new UnprocessableEntityError("invalid_image", "Image is invalid or exceeds the 4 megapixel budget");
+  } finally {
+    activeDecodes--;
+  }
 }

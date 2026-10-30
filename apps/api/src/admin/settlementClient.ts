@@ -274,8 +274,8 @@ export async function triggerMdrRecalculation(
 
 
 /**
- * Dormant refund-adjustment request builder. No server endpoint or caller
- * is implemented; its amount conversion is inconsistent with fils (B48).
+ * Legacy HTTP adapter retained for compatibility. CloseBatch consumes
+ * durable refund rows directly; this helper is not that integration.
  */
 export async function notifySettlementRefundAdjustment(
   config: SettlementInternalConfig,
@@ -291,7 +291,7 @@ export async function notifySettlementRefundAdjustment(
     merchantId: input.merchantId,
     batchId: input.batchId,
     refundId: input.refundId,
-    amountFils: Math.round(input.amountFils / 10),
+    amountFils: input.amountFils,
     feeReversedFils: input.feeReversedFils,
   });
 }

@@ -326,7 +326,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Params: MerchantIdParams }>(
     "/:id/impersonate",
-    { preHandler: [requireAdminSession] },
+    { preHandler: [requireAdminSession, requireAdminRole("support", "finance", "super_admin")] },
     async (request, reply) => {
       const adminAuth = request.adminAuth;
       if (!adminAuth) throw new UnauthorizedError("unauthenticated");

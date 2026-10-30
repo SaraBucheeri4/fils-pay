@@ -1,5 +1,4 @@
 import type { Pool } from "pg";
-import { estimateFeeFils } from "../fees/estimate.js";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -245,8 +244,8 @@ export async function listBatchTransactions(
 
 /**
  * gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils -
- * pendingUnbatchedFils. Pending currently includes only capture events;
- * refund ledger effects are not represented there (B88).
+ * pendingUnbatchedFils. Amounts are attributed to the original activity
+ * window, including refunds and fee corrections, whether claimed or pending.
  */
 export interface ReconciliationReport {
   periodFrom: string;
@@ -271,8 +270,8 @@ function bahrainLocalMidnightUtc(dateStr: string): Date {
 /**
  * @param input.from  inclusive business date (YYYY-MM-DD)
  * @param input.to    exclusive business date (YYYY-MM-DD)
- * @returns explained === true iff gapFils === 0. Pending currently uses
- *          merchant defaults rather than effective fee schedules/tier (B89).
+ * @returns explained === true iff gapFils === 0. Capture fee snapshots
+ *          preserve the actual historical schedule, discount and tier.
  */
 export async function getReconciliationReport(
   pool: Pool,
@@ -281,49 +280,54 @@ export async function getReconciliationReport(
   const windowStart = bahrainLocalMidnightUtc(input.from);
   const windowEnd = bahrainLocalMidnightUtc(input.to);
 
-  const [ledgerResult, settlementResult, pendingResult, merchantResult] = await Promise.all([
-    pool.query<{ net: string }>(
-      `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0) AS net
-         FROM ledger_entries
-        WHERE merchant_id = $1 AND account_id = 'merchant_payable'
-          AND occurred_at >= $2 AND occurred_at < $3`,
-      [input.merchantId, windowStart, windowEnd],
-    ),
-    pool.query<{ total: string }>(
-      `SELECT COALESCE(SUM(net_payout_fils), 0) AS total
-         FROM settlement_batches
-        WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
-          AND status IN ('closed', 'paid')`,
-      [input.merchantId, input.from, input.to],
-    ),
-    pool.query<{ amount_fils: string | number }>(
-      `SELECT te.amount_fils
-         FROM transaction_events te
-         JOIN transactions t ON t.id = te.transaction_id
-        WHERE t.merchant_id = $1 AND te.event_type IN ('captured', 'partially_captured')
-          AND te.settlement_batch_id IS NULL
-          AND te.occurred_at >= $2 AND te.occurred_at < $3`,
-      [input.merchantId, windowStart, windowEnd],
-    ),
-    pool.query<{ mdr_bps: number; negotiated_discount_bps: number }>(
-      `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`,
-      [input.merchantId],
-    ),
-  ]);
+  // One SQL snapshot attributes both batched and pending amounts to their
+  // original Bahrain activity window. Payout legs discharge these accruals;
+  // they must not subtract the same obligation a second time here.
+  const result = await pool.query<{ ledger: string; settled: string; pending: string }>(
+    `WITH activity AS (
+       SELECT te.amount_fils - COALESCE((te.metadata->>'feeFils')::bigint,
+         (SELECT COALESCE(SUM(CASE WHEN fee.direction = 'credit' THEN fee.amount_fils ELSE -fee.amount_fils END), 0)
+          FROM ledger_entries fee
+          WHERE fee.transaction_id = te.transaction_id AND fee.account_id = 'platform_fee_revenue'
+            AND fee.occurred_at = te.occurred_at AND fee.description NOT LIKE 'refund:%')) AS net,
+         te.settlement_batch_id AS batch_id
+       FROM transaction_events te JOIN transactions t ON t.id = te.transaction_id
+       WHERE t.merchant_id = $1 AND te.event_type IN ('captured', 'partially_captured')
+         AND te.occurred_at >= $2 AND te.occurred_at < $3
+       UNION ALL
+       -- Historical discounts were separate payable credits. Include the
+       -- actual posting rather than estimating it at today's merchant rate.
+       SELECT le.amount_fils, latest.settlement_batch_id
+       FROM ledger_entries le
+       LEFT JOIN LATERAL (SELECT te.settlement_batch_id FROM transaction_events te
+         WHERE te.transaction_id = le.transaction_id AND te.event_type IN ('captured','partially_captured')
+         ORDER BY te.occurred_at DESC, te.id DESC LIMIT 1) latest ON true
+       WHERE le.merchant_id = $1 AND le.account_id = 'merchant_payable' AND le.direction = 'credit'
+         AND le.description = 'capture: negotiated discount adjustment'
+         AND le.occurred_at >= $2 AND le.occurred_at < $3
+       UNION ALL
+       SELECT -amount_fils + fee_reversed_fils, settlement_batch_id FROM refunds
+        WHERE merchant_id = $1 AND status = 'succeeded' AND occurred_at >= $2 AND occurred_at < $3
+       UNION ALL
+       SELECT -c.fee_delta_fils, c.settlement_batch_id FROM settlement_fee_corrections c
+        JOIN settlement_batches source ON source.id = c.source_batch_id
+        WHERE c.merchant_id = $1
+          AND source.batch_date >= ($2::timestamptz AT TIME ZONE 'Asia/Bahrain')::date
+          AND source.batch_date < ($3::timestamptz AT TIME ZONE 'Asia/Bahrain')::date
+     )
+     SELECT
+       (SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
+        FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'
+          AND occurred_at >= $2 AND occurred_at < $3
+          AND COALESCE(description, '') NOT LIKE 'settlement payout:%')::text AS ledger,
+       COALESCE(SUM(net) FILTER (WHERE batch_id IS NOT NULL), 0)::text AS settled,
+       COALESCE(SUM(net) FILTER (WHERE batch_id IS NULL), 0)::text AS pending
+     FROM activity`, [input.merchantId, windowStart, windowEnd]);
+  const row = result.rows[0]!;
+  const ledgerMerchantPayableNetFils = Number(row.ledger);
+  const settlementNetPayoutFils = Number(row.settled);
+  const pendingUnbatchedFils = Number(row.pending);
 
-  const merchant = merchantResult.rows[0];
-  const mdrBps = merchant?.mdr_bps ?? 0;
-  const discountBps = merchant?.negotiated_discount_bps ?? 0;
-
-  let pendingUnbatchedFils = 0;
-  for (const row of pendingResult.rows) {
-    const amountFils = Number(row.amount_fils);
-    const feeFils = estimateFeeFils(amountFils, mdrBps, discountBps);
-    pendingUnbatchedFils += amountFils - feeFils;
-  }
-
-  const ledgerMerchantPayableNetFils = Number(ledgerResult.rows[0]?.net ?? 0);
-  const settlementNetPayoutFils = Number(settlementResult.rows[0]?.total ?? 0);
   const gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils - pendingUnbatchedFils;
 
   return {
@@ -359,7 +363,7 @@ export async function getSettlementSummary(
 
   const result = await pool.query<SettlementSummaryRow>(
     `WITH captured AS (
-       SELECT t.id, t.captured_fils
+       SELECT t.id, te.amount_fils AS captured_fils
          FROM transactions t
          JOIN transaction_events te ON te.transaction_id = t.id
         WHERE t.merchant_id = $1

@@ -1,7 +1,7 @@
 import type { FastifyRequest, preHandlerHookHandler } from "fastify";
 import { ForbiddenError, UnauthorizedError } from "../lib/errors.js";
 import { verifyApiKey } from "../apiKeys/verify.js";
-import { lookupImpersonationGrant } from "../admin/impersonation.js";
+import { resolveRequestImpersonation } from "./impersonationContext.js";
 import { lookupSession } from "./sessions.js";
 
 /** @property role null only for API keys. An impersonation actor always carries "support". */
@@ -29,9 +29,9 @@ declare module "fastify" {
 }
 
 /**
- * Accepts EITHER a valid session cookie OR a valid API key. Tries the
- * session cookie first (cheaper, no crypto), falls back to the API-key
- * header. Populates `request.merchantAuth` or throws `UnauthorizedError`.
+ * A live impersonation grant takes precedence and is read-only. Otherwise
+ * accepts a valid merchant session, followed by an API key. Populates
+ * `request.merchantAuth` or throws `UnauthorizedError`.
  *
  * This is the only source of truth for "which merchant is this request
  * allowed to act as" on the transactions surface — every handler that uses
@@ -44,6 +44,17 @@ declare module "fastify" {
  * the two existing checks and normalizes their result shape.
  */
 export const requireMerchantAuth: preHandlerHookHandler = async (request: FastifyRequest): Promise<void> => {
+  const grant = await resolveRequestImpersonation(request);
+  if (grant) {
+    request.merchantAuth = {
+      merchantId: grant.merchantId,
+      actorType: "admin_impersonation",
+      actorId: grant.grantId,
+      role: "support",
+      impersonatedByAdminUserId: grant.adminUserId,
+    };
+    return;
+  }
   const token = request.cookies[request.server.config.cookieName];
   if (token) {
     const session = await lookupSession(request.server.db, token);
@@ -68,30 +79,6 @@ export const requireMerchantAuth: preHandlerHookHandler = async (request: Fastif
         actorType: "merchant_api_key",
         actorId: apiKeyContext.apiKeyId,
         role: null,
-      };
-      return;
-    }
-  }
-
-  // MK: order matters — a merchant holding an old fp_impersonation cookie gets mixed identities. FP-198
-  // FH: tried old grant cookie + real merchant session, got the merchant identity as expected. can't see the bug
-  // Third and last fallback: an operator's "view as merchant" grant, read from
-  // its own cookie (never fp_admin_sid — this function does not know that
-  // cookie's name and never looks at it). The grant resolves to the operator's
-  // standing expressed in the merchant plane's own role vocabulary
-  // (see admin/impersonation.ts), so the existing requireMerchantRole gates
-  // apply to it exactly as they do to a real merchant session — one authority
-  // model, no second "what may impersonation do" allowlist to drift from it.
-  const impersonationToken = request.cookies[request.server.config.impersonationCookieName];
-  if (impersonationToken) {
-    const grant = await lookupImpersonationGrant(request.server.db, impersonationToken);
-    if (grant) {
-      request.merchantAuth = {
-        merchantId: grant.merchantId,
-        actorType: "admin_impersonation",
-        actorId: grant.grantId,
-        role: grant.merchantRole,
-        impersonatedByAdminUserId: grant.adminUserId,
       };
       return;
     }
@@ -126,6 +113,7 @@ export interface MerchantWriterActor {
  */
 // impersonation writes get recorded as merchant_session here — audit cant tell admin from merchant? — am
 export function requireMerchantWriterActor(auth: MerchantAuthContext): MerchantWriterActor {
+  if (auth.actorType === "admin_impersonation") throw new ForbiddenError("forbidden", "Impersonation is read-only");
   if (auth.actorType === "merchant_api_key") {
     return { type: "merchant_api_key", id: auth.actorId };
   }

@@ -17,6 +17,12 @@ export interface SignedPayload {
   signature: string;
 }
 
+/** Signs an already serialized HTTP body without changing its bytes. */
+export function signRawPayload(body: string, secret: string, timestamp = Math.floor(Date.now() / 1000)): SignedPayload {
+  const digest = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+  return { timestamp, signature: `t=${timestamp},v1=${digest}` };
+}
+
 /**
  * Computes the header value a delivery carries. `secret` is the raw
  * (decrypted) webhook secret — callers must decrypt

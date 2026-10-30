@@ -1,7 +1,8 @@
 import type { FastifyRequest, preHandlerHookHandler } from "fastify";
 import type { Pool } from "pg";
 import { sha256Hex } from "../lib/crypto.js";
-import { UnauthorizedError } from "../lib/errors.js";
+import { ForbiddenError, UnauthorizedError } from "../lib/errors.js";
+import { resolveRequestImpersonation } from "../auth/impersonationContext.js";
 
 /** Resolved from key_hash; never contains the raw key. */
 export interface ApiKeyContext {
@@ -32,6 +33,9 @@ export async function verifyApiKey(pool: Pool, rawKey: string): Promise<ApiKeyCo
 }
 
 export const requireApiKey: preHandlerHookHandler = async (request: FastifyRequest): Promise<void> => {
+  if (await resolveRequestImpersonation(request)) {
+    throw new ForbiddenError("forbidden", "This endpoint requires an API key outside impersonation");
+  }
   const header = request.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
     throw new UnauthorizedError("unauthenticated");

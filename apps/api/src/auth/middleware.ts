@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { ForbiddenError, UnauthorizedError } from "../lib/errors.js";
 import { lookupSession } from "./sessions.js";
+import { resolveRequestImpersonation } from "./impersonationContext.js";
 
 export interface AuthContext {
   sessionId: string;
@@ -26,11 +27,15 @@ declare module "fastify" {
  * the single place session validation happens for every route in the
  * codebase — routes never re-implement the auth predicate themselves.
  */
-// MK: legacy — requireMerchantAuth replaced this everywhere except /auth/me. remove after FP-212
+// Session-only endpoints must not fall back to an underlying merchant identity
+// while an operator is viewing another merchant through impersonation.
 export const requireSession: preHandlerHookHandler = async (
   request: FastifyRequest,
   _reply: FastifyReply,
 ): Promise<void> => {
+  if (await resolveRequestImpersonation(request)) {
+    throw new ForbiddenError("forbidden", "This endpoint requires a merchant session outside impersonation");
+  }
   const token = request.cookies[request.server.config.cookieName];
   if (!token) {
     throw new UnauthorizedError("unauthenticated");

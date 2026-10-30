@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { assertDisposableSeedTarget } from "./safety.js";
 import { ZERO_FILS, addFils, applyRateFils, subtractFils, toFils, type Fils } from "@filspay/money";
 import { enqueueEvent } from "@filspay/events";
 import type { Pool, PoolClient } from "pg";
@@ -181,6 +182,7 @@ interface InsertedMerchant {
  * connection.
  */
 export async function generate(pool: Pool): Promise<SeedSummary> {
+  assertDisposableSeedTarget(pool.options.connectionString, process.env);
   const rng = createRng(SEED);
   const config = loadConfig(process.env);
   const passwordHash = await hashPassword(SEED_USER_PASSWORD, config);

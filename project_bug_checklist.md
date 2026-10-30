@@ -15,6 +15,54 @@ must be captured in an approved update to those sources before changing rules.
 
 ## Current source audit - 2026-10-30
 
+### Auth, webhook and reporting remediation - 2026-10-30
+
+The auth/security owner implemented and specifically verified B19, B22–B24,
+B31, B33, B35, B37, B44–B45, B50–B52, B63–B64, B67, B71–B82 and B84–B87.
+These checkmarks describe the targeted fixes, not an end-to-end refund release
+or a green full suite. New migrations are 0090–0095; applied historical files,
+frozen money packages and existing test files remain unchanged.
+
+Verification uses three separate disposable databases in a dedicated local
+Postgres container bound only to 127.0.0.1:55490. The added security unit tests
+pass 9/9; scripts/securityRemediation.test.ts passes 12/12; reporting on its
+own clean database passes 11/11. A two-process Go probe confirms one payout
+event and record with zero subscribers and no new ledger entries. Windows
+Go verification uses go test -short ./...; full database-backed Go coverage
+is not implied. Logs and final suite details: docs/security-remediation-verification.md.
+
+B16 remains open: explicit refund envelope, signed delivery and reporting
+consumption are implemented, but the friend's refund/accounting release
+blockers remain outstanding. The owner confirmed the current producer contract
+as the shared baseline; no separate acknowledgement is pending. The public refund
+route remains disabled. See docs/security-refund-handoff.md.
+
+B53 remains open for external acquirer-side rotation. The committed value was
+removed from ops/.env.docker and its fingerprint is permanently rejected by
+the API, including when the legacy optional-signature flag is false. No
+provider rotation or git-history purge is claimed.
+
+ADR-0008 records the owner's approved all-admin/read-only impersonation,
+atomic under_review-only bulk KYC, and disable-with-retained-history policies.
+Archive creation/replay rejects ranges exceeding 1000 deliveries or 4 MiB;
+legacy oversized archives require bounded offline handling. Rebuilds lock the
+consumer and outbox producers until their snapshot and receipts commit.
+Historical duplicate callbacks/payouts are not silently deleted: unique-index
+migrations fail for explicit review if duplicates exist. Migration 0092 seeds
+receipts from existing watermarks; recovering historical skipped events
+requires a separately scoped rebuild, not an automatic production repair.
+
+**B35 follow-up (2026-10-30, manual QA):** The owner successfully created a
+payment link while viewing as a merchant. The stored writer was the underlying
+Alpha owner session: the initial fix checked merchant sessions/API keys before
+the grant. The correction gives a live grant precedence, applies the read-only
+guard to session-only and API-key-only middleware too, and makes /v1/auth/me
+return the impersonated merchant with support role and no fabricated merchant
+user ID. Real QA requests carrying both cookies returned 403 for payment-link
+creation, API-key creation, saved filters and transaction authorization; reads
+returned 200 for the impersonated merchant. Ending the grant restored the
+underlying merchant session. No new tests were added, per owner instruction.
+
 - Reviewed original B01-B68 against current source/schema and historical evidence. Old test/reproduction statements are author-reported historical records, not fresh results.
 - Removed from active defects: B07-B09 (integration scope), B13 (explicit display-only policy), B17 (documented client-clock policy), B30 (approximate monitoring), B54 (fixture hygiene, no established data exposure). B65 is consolidated into B21, not an unconditional status-change requirement.
 - B56 is resolved by current guide edits; B57 false checksum assurance is corrected without adding checksums. B03 is repaired code awaiting account-kind approval. B59 remains open because replacement coverage does not retire its original failing test.
@@ -40,6 +88,18 @@ Verified against a local Docker stack (Postgres 16, all migrations, seed, all se
 | Found in checklist review (B61–B68) | B61 (critical), B62–B64 and B68 (high), B65–B67; see "Checklist review" for reclassified items |
 
 The source file named above, `bugs.md`, does not exist in this repository or its git history.
+
+## Approved settlement direction — 2026-10-30
+
+The owner's clarification is recorded in [ADR-0007](docs/adr/0007-approved-settlement-corrections.md).
+It supersedes older suggestions in this checklist and the attached task split:
+
+- **B14 is an active cache defect:** the ledger-based CLI calculation is the correct rebuild source. The console must agree; do not preserve the exported-total source merely because an existing test expects it. The reported drop after pressing rebuild is owner-reported, not newly reproduced here.
+- **All calendar windows and displayed timestamps use Bahrain time (UTC+3):** this includes monthly reconciliation, scheduler dates and UI defaults. Preserve absolute stored instants. B27 needs Bahrain boundaries, retry safety and ADR-0002 account directions.
+- **B26 then B15:** derive the scheme representation from its authoritative exported integer amount. Residue is gross minus that integer; post equal credit to card_scheme_clearing and debit to scheme_rounding_residue atomically with the line. A stable line identity with database uniqueness must prevent duplicate postings; skip zero residue.
+- **Accepted settlement ADR implementation is approved:** do not reopen the same approval gate. Proposed/paused settlement v2 and historical data repair are not activated by this approval. Existing protected money packages remain frozen.
+
+These decisions are recorded requirements, not completed fixes. Existing regression-locked tests have not been changed or treated as proof of correct business behavior.
 
 ## Working rules
 
@@ -284,7 +344,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B20, B21, B22 and B23 before activation; coordinate B28 and B39. Add envelope support before enabling a new dispatcher event type.
 
-**Explicit release gate B16-envelope:** buildEnvelope currently handles transaction.captured, transaction.voided and settlement.paid only. Passing refund.succeeded throws unsupported-event-type. Dispatcher eligibility currently excludes it, so this is dormant, not a live blocked queue. Define the public refund envelope and tests before adding eligibility; adding only the event type would roll back delivery creation. This gate is recorded here rather than duplicated as another standalone bug.
+**B16-envelope update (2026-10-30):** Explicit refund.succeeded envelope mapping, signed delivery support and Bahrain-dated reporting consumption have the previously recorded integration coverage. Eligibility was added with those implementations, not by itself. The owner confirmed the current producer contract as the shared baseline; coordination acknowledgement is no longer outstanding. B16 remains open for refund/accounting release blockers outside this owner's scope; the public route remains disabled. See docs/security-refund-handoff.md.
 
 - [ ] **B18 — Slow payment attempts allow two buyers to pay one link** — **high: confirmed code-path race; historical causation not independently established**
 
@@ -308,7 +368,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 - Nothing in the code has changed since: B18 is still exploitable whenever an acquirer call outlasts the reservation timeout. Raising the timeout (the FP-202 side change) only narrows the window; the fix is the attempt identity and single-capture guarantee described above.
 - Follow-ups: correct the postmortem's root cause (as a dated correction, not a rewrite); re-check the two Gamma holds and the settled extra captures that finance credited.
 
-- [ ] **B19 — Callback redeliveries insert duplicate notes**
+- [x] **B19 — Callback redeliveries insert duplicate notes**
 
 **Category:** Duplicate event processing.
 
@@ -355,7 +415,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B20. Verify partial captures, repeated partial refunds, cross-merchant requests and cumulative fee reversal before B16.
 
-- [ ] **B22 — Outbound webhook signatures cover different bytes than delivery**
+- [x] **B22 — Outbound webhook signatures cover different bytes than delivery**
 
 **Category:** Integration correctness.
 
@@ -369,7 +429,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B16 and B24. Check compatibility for receivers previously canonicalizing bodies and document the raw-body contract.
 
-- [ ] **B23 — Inbound callback verification permits unsigned or stale messages**
+- [x] **B23 — Inbound callback verification permits unsigned or stale messages**
 
 **Category:** Callback authentication.
 
@@ -383,7 +443,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B19 and B07. Coordinate signing support with the provider/simulator before enforcing it; freshness policy must accommodate legitimate retries.
 
-- [ ] **B24 — Concurrent payout scans enqueue duplicate notifications**
+- [x] **B24 — Concurrent payout scans enqueue duplicate notifications**
 
 **Category:** Duplicate payout events.
 
@@ -467,7 +527,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B28. Do not change historical charged rates just to match a previously incorrect display.
 
-- [ ] **B31 — Status maintenance accidentally activates test merchants**
+- [x] **B31 — Status maintenance accidentally activates test merchants**
 
 **Category:** Test/live isolation.
 
@@ -501,7 +561,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 - *Logout:* `/v1/auth/logout` used `requireSession`, so after this fix a user who abandoned login on the OTP screen could not revoke the pending session. Logout now accepts an authenticated or a pending session and revokes it; no or an invalid cookie is still 401. Verified by new [logout.new.test.ts](apps/api/src/routes/logout.new.test.ts) (3/3, including that a revoked pending session cannot complete OTP).
 - *View:* `live_sessions` still listed pending sessions, so any future reader would reintroduce this bug. New migration [0075_live_sessions_authenticated_only.sql](db/migrations/0075_live_sessions_authenticated_only.sql) adds `authenticated = true` to the view (same columns, so `CREATE OR REPLACE` applies). The explicit check in `lookupSession` stays for databases that have not run 0075. A new test in `pendingSession.new.test.ts` failed before the migration and passes after it. Applied to `filspay_test` only; the local `filspay` database and the Docker image need `docker compose build migrate api` and an `up` to pick it up.
 
-- [ ] **B33 — Merchant and admin OTP codes use Math.random**
+- [x] **B33 — Merchant and admin OTP codes use Math.random**
 
 **Category:** Authentication randomness.
 
@@ -531,7 +591,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Resolution (2026-10-30):** [cancel.ts](apps/api/src/paymentLinks/cancel.ts) now takes `merchantId` and filters both the UPDATE and the follow-up lookup by it; the route passes `request.merchantAuth.merchantId`. An out-of-scope link returns 404. Verified: new [paymentLinks.new.test.ts](apps/api/src/routes/paymentLinks.new.test.ts) failed on the old code (204, link canceled) and passes now; cancelling one's own link still returns 204.
 
-- [ ] **B35 — Impersonation grants exceed documented write permissions**
+- [x] **B35 — Impersonation grants exceed documented write permissions**
 
 **Category:** Authorization policy conflict.
 
@@ -559,7 +619,7 @@ The remaining item, migration numbers 0054–0056 that ADR-0005 reserves, is a g
 
 **Dependencies / verification:** B38 must be fixed before adopting the existing streaming helper. Measure actual memory; an OOM incident has not been reproduced in this review.
 
-- [ ] **B37 — Webhook archive creation and replay load entire histories**
+- [x] **B37 — Webhook archive creation and replay load entire histories**
 
 **Category:** Resource use.
 
@@ -675,7 +735,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Resolution (2026-10-29):** Added [0073_merchant_daily_volume_refunds.sql](db/migrations/0073_merchant_daily_volume_refunds.sql). Verified: both columns exist after migration. The rollup itself is still not wired (B16) and buckets by the wrong date (B44).
 
-- [ ] **B44 — Refund daily rollup buckets by UTC date**
+- [x] **B44 — Refund daily rollup buckets by UTC date**
 
 **Category:** Business timing (latent).
 
@@ -689,7 +749,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B10, B16. Test refunds at 23:59 and 00:01 Bahrain time.
 
-- [ ] **B45 — Refund summary view joins on the wrong column**
+- [x] **B45 — Refund summary view joins on the wrong column**
 
 **Category:** Reporting correctness (latent).
 
@@ -759,7 +819,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B39. Compare report and batch fees across seed data.
 
-- [ ] **B50 — Payment-link tokens use Math.random**
+- [x] **B50 — Payment-link tokens use Math.random**
 
 **Category:** Payment authorization.
 
@@ -773,7 +833,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B33 uses the same random helper. The old agent-rule justification was removed; uniqueness does not establish unpredictability.
 
-- [ ] **B51 — Admin invite code references a table that does not exist**
+- [x] **B51 — Admin invite code references a table that does not exist**
 
 **Category:** Schema gap / authentication randomness (dead code).
 
@@ -787,7 +847,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** None.
 
-- [ ] **B52 — Seed wipes every merchant-linked table**
+- [x] **B52 — Seed wipes every merchant-linked table**
 
 **Category:** Operational safety.
 
@@ -921,7 +981,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B32. In a real deployment, review API keys issued from sessions that never completed OTP.
 
-- [ ] **B63 — Webhook endpoint URLs are not checked for internal hosts (SSRF)**
+- [x] **B63 — Webhook endpoint URLs are not checked for internal hosts (SSRF)**
 
 **Category:** Security.
 
@@ -935,7 +995,9 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B22 (same send path). Test with `http://127.0.0.1`, `http://169.254.169.254` and a hostname resolving to a private IP.
 
-- [ ] **B64 — Any admin role can start impersonation**
+- [x] **B64 — Any admin role can start impersonation**
+
+**Resolution (2026-10-30):** The owner explicitly permits support, finance and super_admin. The route now enumerates those roles with requireAdminRole; every grant maps to merchant support and central auth rejects writes. ADR-0008 records the approved policy; this is not a restriction to super_admin.
 
 **Category:** Authorization (extends B35).
 
@@ -963,7 +1025,7 @@ Existing sessions issued before the fix may belong to the wrong merchant; in a r
 
 **Dependencies / verification:** B49. Compare capture-time and batch fees across seed data.
 
-- [ ] **B67 — Credit second approver is compared by display name**
+- [x] **B67 — Credit second approver is compared by display name**
 
 **Category:** Authorization / four-eyes control.
 
@@ -1185,7 +1247,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Use one agreed fee flow after resolving B66.
 
-- [ ] **B71 - Payout records depend on webhook subscriber count**
+- [x] **B71 - Payout records depend on webhook subscriber count**
 
 **Evidence and impact:** Dispatcher PRE_DELIVERY_EFFECTS inserts a disbursement per first delivery attempt. Zero subscribers means no record; multiple endpoints/replays mean multiple records. This is not proof of duplicate bank transfers.
 
@@ -1193,7 +1255,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Record actual payout bookkeeping once per business payout, independently of notification delivery.
 
-- [ ] **B72 - Report scope accepts an unrelated merchant child**
+- [x] **B72 - Report scope accepts an unrelated merchant child**
 
 **Evidence and impact:** resolveReportMerchantId checks global child membership without authenticated parent membership. A merchant can request another marketplace child transactions.
 
@@ -1201,7 +1263,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Scope the parent-child relationship to caller and requested child; test unrelated tenants.
 
-- [ ] **B73 - Rollback failure masks the original transaction error**
+- [x] **B73 - Rollback failure masks the original transaction error**
 
 **Evidence and impact:** Awaiting ROLLBACK before rethrow means rollback rejection replaces the original error. This proves error masking, not that every failed client is reused.
 
@@ -1209,7 +1271,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Preserve original failure, record rollback error separately and discard a confirmed broken client.
 
-- [ ] **B74 - Reporting cursor is not locked across processes**
+- [x] **B74 - Reporting cursor is not locked across processes**
 
 **Evidence and impact:** readCursor lacks FOR UPDATE; separate worker/catch-up processes can apply the same existing-cursor range. Local running flag cannot serialize processes.
 
@@ -1217,7 +1279,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Serialize by durable consumer identity and test concurrent passes.
 
-- [ ] **B75 - Sequence watermark skips late-committing events**
+- [x] **B75 - Sequence watermark skips late-committing events**
 
 **Evidence and impact:** A reserves low ID, B commits high ID, consumer advances high, A commits afterward and is excluded by id > watermark. Sequence allocation is not commit order.
 
@@ -1225,7 +1287,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Use durable per-event consumption or correctly designed commit-safe ordering; coordinate B74.
 
-- [ ] **B76 - Admin analytics rebuild does not coordinate consumer cursor**
+- [x] **B76 - Admin analytics rebuild does not coordinate consumer cursor**
 
 **Evidence and impact:** Admin refresh includes transaction_events already committed but not yet consumed; subsequent worker replay can add them again. Source rebuild does not move/lock cursor to its snapshot.
 
@@ -1233,7 +1295,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Coordinate snapshot, cursor and worker, or use one safe replay/rebuild mechanism.
 
-- [ ] **B77 - Missing daily rollup can poison batch-close reporting**
+- [x] **B77 - Missing daily rollup can poison batch-close reporting**
 
 **Evidence and impact:** With captures but no daily-volume row, applyBatchClosed dereferences rows[0].captured_count and throws. Rollback/retry can repeat indefinitely. Missing-batch coverage is not missing-rollup coverage.
 
@@ -1241,7 +1303,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Handle/recover missing rollup and test it separately.
 
-- [ ] **B78 - Payout trends omit paid lifecycle updates**
+- [x] **B78 - Payout trends omit paid lifecycle updates**
 
 **Evidence and impact:** Consumer handles batch_closed but not settlement.paid. If close is consumed before payout, cached status/paid_at remain stale until rebuilt.
 
@@ -1249,7 +1311,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Apply payout lifecycle changes idempotently and test close-before-pay ordering.
 
-- [ ] **B79 - Reporting export-summary lacks authentication prehandler**
+- [x] **B79 - Reporting export-summary lacks authentication prehandler**
 
 **Evidence and impact:** Registered route dereferences merchantAuth without running its authentication prehandler. A cookie alone does not populate context. This is an error path, not established data disclosure.
 
@@ -1257,7 +1319,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Require authentication and test missing/valid/expired credentials.
 
-- [ ] **B80 - Webhook response bodies have no byte limit**
+- [x] **B80 - Webhook response bodies have no byte limit**
 
 **Evidence and impact:** response.text buffers the full response before SQL excerpt truncation. A timeout bounds duration, not memory. No specific OOM was reproduced.
 
@@ -1265,7 +1327,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Bound streamed response bytes and preserve timeout/cancellation; coordinate SSRF fix B63.
 
-- [ ] **B81 - PDF-only KYC check trusts filename**
+- [x] **B81 - PDF-only KYC check trusts filename**
 
 **Evidence and impact:** Generic magic accepts JPEG/PNG/PDF; document-specific check tests .pdf extension. A JPEG named CR.pdf passes.
 
@@ -1273,7 +1335,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Compare detected type against document-specific requirement; test renamed images.
 
-- [ ] **B82 - Thumbnail lacks an application-specific decoded-pixel budget**
+- [x] **B82 - Thumbnail lacks an application-specific decoded-pixel budget**
 
 **Evidence and impact:** Compressed upload cap does not bound decoded pixels. sharp is invoked without an explicit application memory/pixel budget. No current library default or actual OOM was verified here.
 
@@ -1289,7 +1351,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Reverse remaining net charged fee cumulatively; coordinate B16/B20/B21 before launch.
 
-- [ ] **B84 - Webhook delivery attempts lack cross-replica claim**
+- [x] **B84 - Webhook delivery attempts lack cross-replica claim**
 
 **Evidence and impact:** Due rows are selected without lock or claimed state. Replicas can send same row and execute first-attempt financial effects concurrently. At-least-once notifications do not excuse duplicate bookkeeping.
 
@@ -1297,7 +1359,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Claim attempts durably and make business effects separately idempotent; coordinate B24/B71.
 
-- [ ] **B85 - Bulk KYC bypasses advertised state/review trail**
+- [x] **B85 - Bulk KYC bypasses advertised state/review trail**
 
 **Evidence and impact:** Bulk update accepts every supplied merchant ID without under_review predicate and writes bulk admin audit without individual merchant_kyc_reviews. The individual review workflow differs.
 
@@ -1305,7 +1367,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Confirm bulk-transition policy and preserve required individual review evidence.
 
-- [ ] **B86 - Saved-filter listing relies on nonexistent count cap**
+- [x] **B86 - Saved-filter listing relies on nonexistent count cap**
 
 **Evidence and impact:** Code claims a50-filter CHECK in0061, but0061 seeds accounts and0069 has no count cap. Inserts/list are unbounded. This is a capacity risk, not a reproduced outage.
 
@@ -1313,7 +1375,7 @@ No production or disposable-database integration reproduction is claimed for the
 
 **Suggested fixes:** Enforce an actual quota or paginate; remove fictitious constraint assurance.
 
-- [ ] **B87 - Webhook deletion conflicts with foreign-key retention promises**
+- [x] **B87 - Webhook deletion conflicts with foreign-key retention promises**
 
 **Evidence and impact:** deleteWebhookEndpoint hard-deletes the endpoint. Delivery endpoint_id is NOT NULL with a restrictive FK, not ON DELETE SET NULL/CASCADE; archives also reference endpoints. Existing rows can cause a constraint failure rather than the promised retained-history deletion. No migration altering that delivery FK was found.
 
@@ -1372,3 +1434,43 @@ Review of a1e19d7 and the proposed follow-up. These entries distinguish confirme
 **Suggested fixes:** Expose cumulative refundedFils consistently in row projection, serializer, API/client types and read responses, with schema-deployment compatibility. Test zero, partial and full refunds. Keep pending refund reservations distinct if they are added; never infer server authorization solely from the displayed balance.
 
 **Dependencies / verification:** B16, B20, B21, B68. Only misleading comments were corrected here; response behavior is unchanged.
+
+
+## Finance-owner implementation update (2026-10-30)
+
+The owner requested logical code changes only and stopped Docker/database
+recovery. These are working-tree implementations, not claims of deployment
+or completed database verification. Existing checkboxes remain open until
+integration evidence is available.
+
+| Entries | Current finance-owned changes |
+|---|---|
+| B26, B15, B27 | Exact exported integer amount; atomic residue trigger with unique line receipt; correct clearing-credit/residue-debit directions; Bahrain March bounds; dry-run default and legacy-sweep guard. No historical repair executed. |
+| B14, B55 | Console, CLI and 02:00 Bahrain refresh share a set-based ledger rebuild; cache writes serialize and settlement refreshes actual ledger balances. |
+| B10, B11, B25, B46, B30 | Bahrain scheduler date; integer net; conserving largest-remainder split; BIGINT counters, integer monitoring sums and overflow rejection. Existing approximate history is not reconstructed. |
+| B28 | Closed/paid totals and carry frozen by database triggers; new balanced period-dated journals with pending settlement claims; repeated identical recalculation has no new delta. |
+| B66, B70, B47, B49, B89, B39, B29 | Discount-before-MDR in common capture; actual fee/rate/tier snapshots; exact parsers and estimation; effective schedule display; event-delta summary and actual-fee reconciliation. Legacy discounted transactions spanning batches require separate attribution review. |
+| B18, B69 | Per-reservation identity locked through capture/finalization; transaction-aware capture idempotency; stable provider keys; failed-claim retries lock the existing row. |
+| B20, B21, B65, B83 | Refund row lock spans validation/acquirer/journal/commit; captured-minus-refunded ceiling; reversals conserve remaining historical net fees, including discount debits and later differently priced captures. |
+| B88, B91 | Refund/correction reconciliation in one snapshot, pending/batched attribution and payout discharge exclusion; refundedFils in transaction responses. |
+| B48, B90 | Durable refund rows claimed atomically by CloseBatch in integer fils; negative net carried forward (ADR-0010); only explicit true enables merchant refunds (ADR-0009), enforced in entrypoint and processor. |
+| B12, B38, B36 | Validated BHD parser; exact timestamp-text plus UUID export cursor; consistent read snapshot; bounded streaming pages and backpressure. |
+| B13 | ADMIN.md corrected while preserving ADR-0006 display-only adjustments and rebuild reset behavior. |
+| B03 | Existing repaired migration0055 preserved. Fresh and upgrade migration execution remains unverified. |
+| B16 | Producer route wired behind FEATURE_REFUNDS (default false), preserving the teammate event contract. Release/drawer activation awaits shared safety and downstream verification. |
+
+Migrations0080-0084 were added in the reserved range after checkout
+availability checks. Deployed migration history was unavailable. Applied
+migrations, frozen money packages, existing regression-locked tests and the
+teammate's auth/delivery/reporting/payout_notify.go changes were preserved.
+Settlement v2 remains paused.
+
+Verification: full TypeScript typecheck passed;27 focused TypeScript money
+and refund tests passed. New Go finance/date/split unit tests passed, with
+DB-backed tests skipped because no disposable DATABASE_URL was available.
+Full npm test was attempted: events4/4 and money40/40 passed; database suites
+failed their prerequisites. Windows Go short suite was attempted; the
+preserved TestSchedulingLocationUsesTZ expects UTC and conflicts with the
+required Bahrain behavior. Database races, export pages, fresh/upgrade
+migrations, carry integration and downstream end-to-end tests are unverified.
+No staging/production work, deployment, or historical data repair occurred.

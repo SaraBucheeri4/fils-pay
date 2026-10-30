@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { ForbiddenError } from "../lib/errors.js";
 
 export async function resolveReportMerchantId(
   pool: Pool,
@@ -10,11 +11,11 @@ export async function resolveReportMerchantId(
   }
 
   const result = await pool.query<{ ok: number }>(
-    `SELECT 1 AS ok FROM merchant_split_children WHERE child_merchant_id = $1`,
-    [requestedMerchantId],
+    `SELECT 1 AS ok FROM merchant_split_children WHERE child_merchant_id = $1 AND parent_merchant_id = $2`,
+    [requestedMerchantId, callerMerchantId],
   );
   if (result.rows.length === 0) {
-    return callerMerchantId;
+    throw new ForbiddenError("report_merchant_forbidden");
   }
   return requestedMerchantId;
 }

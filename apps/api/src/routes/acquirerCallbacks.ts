@@ -54,6 +54,10 @@ export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void
       );
     }
 
+    if (!["cleared", "confirmed_fraud"].includes(body.outcome) || !Number.isFinite(Date.parse(body.occurredAt))) {
+      throw new BadRequestError("invalid_request", "invalid outcome or occurredAt");
+    }
+
     const verification = verifyAcquirerCallbackSignature(
       body,
       getSignatureHeader(request),

@@ -58,7 +58,7 @@ export async function processRefund(
   });
 
   // 1 validate
-  const prepared = await withTransaction(pool, async (client) => {
+  return withTransaction(pool, async (client) => {
     const claim = await claimIdempotencyKey(client, {
       merchantId: input.merchantId,
       endpoint: ENDPOINT,
@@ -73,16 +73,13 @@ export async function processRefund(
       throw new ConflictError("request_in_progress");
     }
     if (claim.outcome === "replay") {
-      return {
-        kind: "settled" as const,
-        result: { statusCode: claim.row.responseStatusCode ?? 200, body: claim.row.responseBody },
-      };
+      return { statusCode: claim.row.responseStatusCode ?? 200, body: claim.row.responseBody };
     }
 
     const txnResult = await client.query<RefundTransactionRow>(
       `SELECT id, merchant_id, status, amount_fils, captured_fils, refunded_fils, acquirer_reference
          FROM transactions
-        WHERE id = $1 AND merchant_id = $2`,
+        WHERE id = $1 AND merchant_id = $2 FOR UPDATE`,
       [input.transactionId, input.merchantId],
     );
     // Another merchant's transaction is indistinguishable from a missing one.
@@ -90,14 +87,22 @@ export async function processRefund(
     if (!txn) {
       const body = { error: "transaction_not_found" };
       await completeIdempotencyKey(client, claim.row.id, { statusCode: 404, body });
-      return { kind: "settled" as const, result: { statusCode: 404, body } };
+      return { statusCode: 404, body };
+    }
+
+    const policy = await client.query<{ refunds_enabled: boolean | null }>(
+      `SELECT refunds_enabled FROM merchants WHERE id = $1 FOR SHARE`, [input.merchantId]);
+    if (policy.rows[0]?.refunds_enabled !== true) {
+      const body = { error: "refunds_on_hold" };
+      await completeIdempotencyKey(client, claim.row.id, { statusCode: 403, body });
+      return { statusCode: 403, body };
     }
 
     const amountAuthorized = toFils(Number(txn.amount_fils));
     const capturedFils = toFils(Number(txn.captured_fils));
     const refundedFils = toFils(Number(txn.refunded_fils));
 
-    const refundableFils = subtractFils(amountAuthorized, refundedFils);
+    const refundableFils = subtractFils(capturedFils, refundedFils);
 
     const validation = validateRefundRequest(
       {
@@ -113,17 +118,16 @@ export async function processRefund(
     if (!validation.ok) {
       const statusCode = validation.code === "transaction_not_refundable" ? 409 : 422;
       await completeIdempotencyKey(client, claim.row.id, { statusCode, body: validation });
-      return { kind: "settled" as const, result: { statusCode, body: validation } };
+      return { statusCode, body: validation };
     }
 
-    // Reads credited fee legs. Discount debits are not netted here, so this
-    // is not necessarily the net fee actually charged (B83).
+    // Net all fee legs, including historical discount debits and refund
+    // reversals, to recover the fee still charged on outstanding funds.
     const feeResult = await client.query<{ fee_fils: string }>(
-      `SELECT COALESCE(SUM(amount_fils), 0)::text AS fee_fils
+      `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)::text AS fee_fils
          FROM ledger_entries
         WHERE transaction_id = $1
-          AND account_id = 'platform_fee_revenue'
-          AND direction = 'credit'`,
+          AND account_id = 'platform_fee_revenue'`,
       [txn.id],
     );
     const feeRow = feeResult.rows[0];
@@ -131,34 +135,29 @@ export async function processRefund(
       throw new Error("processRefund: fee aggregate returned no row");
     }
 
-    return {
-      kind: "proceed" as const,
+    // Allocate the remaining historical fee against remaining captured funds.
+    // A full final refund returns the exact remainder, even if later captures
+    // used different pricing. Validate before contacting the acquirer.
+    const feeOutstanding = toFils(Number(feeRow.fee_fils));
+    const feeReversedFils = calculateRefundFee(refundableFils, feeOutstanding, validation.amountFils);
+    const prepared = {
       claimId: claim.row.id,
-      attemptCount: claim.row.attemptCount,
       transactionId: txn.id,
       merchantId: txn.merchant_id,
       acquirerReference: txn.acquirer_reference,
       amountAuthorized,
       capturedFils,
       refundedFils,
-      feeChargedFils: toFils(Number(feeRow.fee_fils)),
       requestedAmount: validation.amountFils,
     };
-  });
 
-  if (prepared.kind === "settled") {
-    return prepared.result;
-  }
+    // Keep the transaction row locked through the acquirer call and commit.
+    const acquirerResult = await acquirer.refund({
+      acquirerReference: prepared.acquirerReference,
+      amountFils: prepared.requestedAmount,
+      idempotencyKey: hashRequest({ merchantId: input.merchantId, endpoint: ENDPOINT, key: input.idempotencyKey, transactionId: input.transactionId }),
+    });
 
-  // 2 acquirer
-  const acquirerResult = await acquirer.refund({
-    acquirerReference: prepared.acquirerReference,
-    amountFils: prepared.requestedAmount,
-    idempotencyKey: `${prepared.claimId}:${prepared.attemptCount}`,
-  });
-
-  // 3 journal
-  return withTransaction(pool, async (client) => {
     if (acquirerResult.outcome === "declined") {
       const body = { error: "refund_declined" };
       await completeIdempotencyKey(client, prepared.claimId, { statusCode: 402, body });
@@ -176,11 +175,7 @@ export async function processRefund(
       capturedFils: prepared.capturedFils,
       refundedTotalFils: newRefundedTotal,
     });
-    const feeReversedFils = calculateRefundFee(
-      prepared.capturedFils,
-      prepared.feeChargedFils,
-      prepared.requestedAmount,
-    );
+
 
     const refundResult = await client.query<{ id: string; occurred_at: Date }>(
       `INSERT INTO refunds

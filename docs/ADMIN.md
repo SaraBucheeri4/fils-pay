@@ -53,14 +53,16 @@ from last month, pick the effective date the credit belongs to.
 
 **Adjust balance** — when a merchant's balance on screen is wrong and support
 has confirmed the right figure (statement, phone call), enter the difference
-and a reason. The adjustment is journaled to the ledger and the dashboard
-shows the corrected balance straight away; no need to wait for the next
-settlement run.
+and a reason. This is a display-only cache correction with an audit record
+(ADR-0006); it creates no ledger posting and changes no settlement obligation.
+A rebuild resets it. Use Rebuild, then Adjust. Finance-approved money
+corrections require a separate balanced journal, counter-account and reason.
 
 **Recalculate MDR** — after a merchant's rate changes, run this over the
-date range you want the new rate applied to. Their batches are recalculated
-at the current rate and the difference is posted, so their history and
-reconciliation match what finance agreed with them.
+date range approved by finance. Closed and paid batch totals remain frozen.
+The difference becomes a new balanced journal for the corrected period and
+is included in a later payout; a negative net carries forward (ADR-0010).
+Rerunning at the same terms posts no additional correction.
 
 **Import adjustments** — paste a CSV of corrections with a
 `merchantId,amount,reason` header. Amounts are in BD as finance's sheets
@@ -75,10 +77,11 @@ merchant). Days that are already closed or paid are skipped, so re-running
 is always safe.
 
 **Rebuild cached balances** — refreshes every merchant's cached balance.
-Run it whenever a balance looks off or after any manual correction.
+It uses the same ledger calculation as the CLI. Run it before applying any
+display-only correction, because rebuilding overwrites those corrections.
 It only rewrites the balance cache, never the ledger, so it's safe to run
 as often as you like; it asks for confirmation because it covers every
-merchant at once. The nightly recompute does the same thing at 02:00.
+merchant at once. The nightly recompute does the same thing at 02:00 Bahrain time (UTC+3).
 
 **Rebuild analytics** — dashboards lag a little behind live activity by
 design. If they look stale, rebuild them from scratch here instead of

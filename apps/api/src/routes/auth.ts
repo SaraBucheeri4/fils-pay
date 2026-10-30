@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { verifyPassword } from "../auth/passwords.js";
 import { issueChallenge, verifyOtpCode } from "../auth/otp.js";
-import { requireSession } from "../auth/middleware.js";
+import { requireMerchantAuth } from "../auth/requireMerchantAuth.js";
 import { sendOtpCode } from "../auth/notifier.js";
 import {
   createPendingSession,
@@ -257,9 +257,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/me",
-    { preHandler: requireSession },
+    { preHandler: requireMerchantAuth },
     async (request: FastifyRequest) => {
-      const auth = request.auth;
+      const context = request.merchantAuth;
+      if (context?.actorType === "admin_impersonation") {
+        const result = await app.db.query<{ id: string; display_name: string; onboarding_status: string; email: string }>(
+          `SELECT m.id, m.display_name, m.onboarding_status, a.email
+           FROM merchants m JOIN admin_users a ON a.id = $2 WHERE m.id = $1`,
+          [context.merchantId, context.impersonatedByAdminUserId],
+        );
+        const merchant = result.rows[0];
+        if (!merchant) throw new UnauthorizedError("unauthenticated");
+        return {
+          merchantUserId: null, email: merchant.email, role: "support",
+          impersonation: { grantId: context.actorId, adminUserId: context.impersonatedByAdminUserId },
+          merchant: { id: merchant.id, displayName: merchant.display_name, onboardingStatus: merchant.onboarding_status },
+        };
+      }
+      if (context?.actorType !== "merchant_session") throw new UnauthorizedError("unauthenticated");
+      const token = request.cookies[app.config.cookieName];
+      const auth = token ? await lookupSession(app.db, token) : null;
       if (!auth) {
         throw new UnauthorizedError("unauthenticated");
       }

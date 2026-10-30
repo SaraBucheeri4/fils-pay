@@ -23,6 +23,8 @@ export interface Config {
   otpCodeLength: number;
   otpMaxAttempts: number;
   otpDevExpose: boolean;
+  /** Release gate; merchant opt-in is independently required (ADR-0009). */
+  refundsReleaseEnabled: boolean;
 
   argon2MemoryKib: number;
   argon2TimeCost: number;
@@ -116,7 +118,7 @@ export interface Config {
    *  unlike webhookSecretEncryptionKey, there is exactly one acquirer
    *  relationship, not one secret per registered endpoint. */
   acquirerCallbackSigningSecret: string;
-  /** Set true once the sandbox signs everything. */
+  /** Legacy setting; callback verification is mandatory regardless of this value. */
   acquirerCallbackRequireSignature: boolean;
 }
 
@@ -216,6 +218,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     otpCodeLength: parseIntEnv(env.OTP_CODE_LENGTH, 6),
     otpMaxAttempts: parseIntEnv(env.OTP_MAX_ATTEMPTS, 5),
     otpDevExpose: parseBoolEnv(env.OTP_DEV_EXPOSE, nodeEnv !== "production"),
+    refundsReleaseEnabled: parseBoolEnv(env.FEATURE_REFUNDS, false),
 
     argon2MemoryKib: parseIntEnv(env.ARGON2_MEMORY_KIB, 19_456),
     argon2TimeCost: parseIntEnv(env.ARGON2_TIME_COST, 2),

@@ -22,6 +22,7 @@ interface ClaimedLinkRow {
   merchant_id: string;
   amount_fils: string | number;
   reference: string | null;
+  reservation_id: string;
 }
 
 interface LinkStatusRow {
@@ -43,13 +44,9 @@ export function expiryReferenceTime(submittedAt?: string): Date {
  * then `captureTransaction` directly, in sequence, never issuing an HTTP
  * request back into the API's own /v1/transactions routes.
  *
- * Concurrency: reserve the link with a single
- * atomic conditional UPDATE, release the row lock immediately, run
- * authorize+capture with no lock held on payment_links at all, then
- * finalize with a second atomic conditional UPDATE keyed on still being in
- * the 'reserved' state. A short, configurable reservation timeout
- * self-heals a link stuck 'reserved' by a crash between claim and
- * finalize, with no sweep job.
+ * Each reservation has its own identity. Capture locks and validates that
+ * identity before contacting the acquirer, then marks the link paid in the
+ * same transaction. A timed-out authorization cannot capture a newer claim.
  */
 export async function payPaymentLink(
   pool: Pool,
@@ -64,14 +61,14 @@ export async function payPaymentLink(
   // YA: one conditional UPDATE = atomic claim, no explicit txn needed. correct
   const claimResult = await pool.query<ClaimedLinkRow>(
     `UPDATE payment_links
-        SET status = 'reserved', reserved_at = now()
+        SET status = 'reserved', reserved_at = now(), reservation_id = gen_random_uuid()
       WHERE token = $1
         AND (
              status = 'active'
              OR (status = 'reserved' AND reserved_at < now() - ($2 || ' seconds')::interval)
             )
         AND expires_at > $3
-      RETURNING id, merchant_id, amount_fils, reference`,
+      RETURNING id, merchant_id, amount_fils, reference, reservation_id`,
     [input.token, config.paymentLinkReservationTimeoutSeconds, expiryCheckTime],
   );
 
@@ -102,7 +99,7 @@ export async function payPaymentLink(
   });
 
   if (authResult.statusCode !== 201) {
-    await releaseReservation(pool, link.id);
+    await releaseReservation(pool, link.id, claimedRow.reservation_id);
     return {
       statusCode: authResult.statusCode,
       body: { stage: "authorize", ...(authResult.body as Record<string, unknown>) },
@@ -118,6 +115,7 @@ export async function payPaymentLink(
   // nothing else could have touched it yet.
   const captureKey = `paylink:${link.id}:${input.idempotencyKey}:capture`;
   const captureResult = await captureTransaction(pool, acquirer, {
+    paymentLinkClaim: { linkId: link.id, reservationId: claimedRow.reservation_id },
     transactionId: txnId,
     merchantId: link.merchantId,
     idempotencyKey: captureKey,
@@ -125,26 +123,17 @@ export async function payPaymentLink(
   });
 
   if (captureResult.statusCode !== 200) {
-    await releaseReservation(pool, link.id);
+    await releaseReservation(pool, link.id, claimedRow.reservation_id);
     return {
       statusCode: captureResult.statusCode,
       body: { stage: "capture", ...(captureResult.body as Record<string, unknown>) },
     };
   }
 
-  // see incident 2026-05-14 — two customers charged on one link. root cause: the claim
-  // am: was it? FP-198 is still open
-  // Step 4 — finalize.
-  const finalizeResult = await pool.query<{
-    id: string;
-    paid_at: Date;
-  }>(
-    `UPDATE payment_links
-        SET status = 'paid', paid_at = now(), transaction_id = $2, reserved_at = NULL
-      WHERE id = $1 AND status = 'reserved'
-      RETURNING id, paid_at`,
-    [link.id, txnId],
-  );
+  // Capture finalizes the link atomically while holding its attempt lock.
+  const finalizeResult = await pool.query<{ id: string; paid_at: Date }>(
+    `SELECT id, paid_at FROM payment_links WHERE id = $1 AND status = 'paid' AND transaction_id = $2`,
+    [link.id, txnId]);
 
   const finalized = finalizeResult.rows[0];
   // FH: this IS reachable — if capture takes past the reservation timeout a second request re-claims,
@@ -182,9 +171,9 @@ export async function payPaymentLink(
  * 'reserved'` for the same reason as the finalize UPDATE: this request
  * only ever releases the reservation it itself holds.
  */
-async function releaseReservation(pool: Pool, linkId: string): Promise<void> {
-  await pool.query(`UPDATE payment_links SET status = 'active', reserved_at = NULL WHERE id = $1 AND status = 'reserved'`, [
-    linkId,
+async function releaseReservation(pool: Pool, linkId: string, reservationId: string): Promise<void> {
+  await pool.query(`UPDATE payment_links SET status = 'active', reserved_at = NULL, reservation_id = NULL WHERE id = $1 AND status = 'reserved' AND reservation_id = $2`, [
+    linkId, reservationId,
   ]);
 }
 

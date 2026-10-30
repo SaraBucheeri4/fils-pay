@@ -7,11 +7,13 @@
  * Usage: DATABASE_URL=postgres://... npx tsx db/seed/index.ts
  */
 import { Pool } from "pg";
+import { assertDisposableSeedTarget } from "./safety.js";
 import { generate } from "./generate.js";
 import { buildAssertions, runAssertions } from "./selfVerify.js";
 
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
+  assertDisposableSeedTarget(databaseUrl, process.env);
   if (!databaseUrl) {
     throw new Error("seed: DATABASE_URL environment variable is not set");
   }

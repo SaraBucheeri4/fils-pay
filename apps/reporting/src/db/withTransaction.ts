@@ -21,6 +21,7 @@ export async function withTransaction<T>(
 ): Promise<T> {
   // MK: copy of apps/api/src/db/withTransaction.ts, keep the two in sync
   const client = await pool.connect();
+  let releaseError: Error | undefined;
   try {
     await client.query("BEGIN");
     try {
@@ -28,10 +29,15 @@ export async function withTransaction<T>(
       await client.query("COMMIT");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        releaseError = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        console.error("[reporting/db] rollback failed", { rollbackError: releaseError });
+      }
       throw err;
     }
   } finally {
-    client.release();
+    client.release(releaseError);
   }
 }

@@ -39,9 +39,8 @@ export async function adminMerchantsBulkRoutes(app: FastifyInstance): Promise<vo
         throw new BadRequestError("invalid_request", "merchantIds must all be UUIDs");
       }
 
-      // Ids that name no merchant row simply return nothing from the UPDATE,
-      // so existence needs no separate probe here — the response's
-      // approvedMerchantIds is the authoritative list of what actually moved.
+      // The service locks and validates every selected merchant before writing
+      // individual reviews; any invalid selection rejects the entire request.
       const result = await bulkApproveMerchantsKyc(app.db, {
         merchantIds,
         adminUserId: adminAuth.adminUserId,
