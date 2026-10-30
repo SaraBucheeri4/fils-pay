@@ -8,3 +8,6 @@ npm-debug.log*
 .claude/
 bugs.md
 reports/
+.codex/
+tmp-go-build/
+.tmp/

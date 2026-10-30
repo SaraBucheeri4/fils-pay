@@ -72,8 +72,10 @@ type runBatchResponse struct {
 // runBatchFailedResponse names merchants whose close or payout failed. The
 // others in the pass were still processed.
 type runBatchFailedResponse struct {
-	Error             string   `json:"error"`
-	FailedMerchantIDs []string `json:"failedMerchantIds"`
+	Error             string                         `json:"error"`
+	FailedMerchantIDs []string                       `json:"failedMerchantIds"`
+	BusinessDate      string                         `json:"businessDate"`
+	MerchantResults   []merchantBatchOutcomeResponse `json:"merchantResults"`
 }
 
 // rebuildDiffResponse is the JSON projection of ledger.RebuildDiff.
@@ -238,16 +240,6 @@ func handleRunBatch(pool *pgxpool.Pool) http.Handler {
 		}
 
 		report, err := settlement.RunDailyBatch(r.Context(), pool, businessDate, onlyMerchant)
-		if err != nil {
-			log.Printf("settlement internal api: run-batch(%s): %d merchant(s) failed: %v", body.Date, len(report.Failures), err)
-			failed := make([]string, 0, len(report.Failures))
-			for _, f := range report.Failures {
-				failed = append(failed, f.MerchantID.String())
-			}
-			writeJSON(w, http.StatusInternalServerError, runBatchFailedResponse{Error: "run_batch_failed", FailedMerchantIDs: failed})
-			return
-		}
-
 		results := make([]merchantBatchOutcomeResponse, 0, len(report.MerchantResults))
 		for _, result := range report.MerchantResults {
 			results = append(results, merchantBatchOutcomeResponse{
@@ -259,6 +251,19 @@ func handleRunBatch(pool *pgxpool.Pool) http.Handler {
 				FeeFils:       int64(result.FeeFils),
 				NetPayoutFils: int64(result.NetPayoutFils),
 			})
+		}
+
+		// A partial failure previously discarded evidence of payouts that had
+		// succeeded. Return both lists so callers can audit the actual outcome.
+
+		if err != nil {
+			log.Printf("settlement internal api: run-batch(%s): %d merchant(s) failed: %v", body.Date, len(report.Failures), err)
+			failed := make([]string, 0, len(report.Failures))
+			for _, f := range report.Failures {
+				failed = append(failed, f.MerchantID.String())
+			}
+			writeJSON(w, http.StatusInternalServerError, runBatchFailedResponse{Error: "run_batch_failed", FailedMerchantIDs: failed, BusinessDate: report.BusinessDate.Format(businessDateLayout), MerchantResults: results})
+			return
 		}
 
 		writeJSON(w, http.StatusOK, runBatchResponse{

@@ -4,6 +4,22 @@ All notable changes to FilsPay. Dates are deploy dates (Asia/Bahrain).
 Versions are the API image tag; settlement and reporting are versioned with
 it. Format loosely follows Keep a Changelog.
 
+## [Unreleased]
+
+### Fixed
+- Keep payment links blocked through unknown capture outcomes across merchant
+  capture/void calls; audit review attempts before payment operations and retain
+  acquirer confirmation evidence for release.
+- Preserve recorded tier-priced fees during MDR recalculation. Journal fallback
+  fees atomically with batch close; refuse captures with incomplete gross or
+  inconsistent journals instead of paying from unrecorded accounting.
+- Give platform finance direct integrity reporting and a paginated cross-merchant
+  capture-review list; validate integrity report dates before querying.
+- Reuse refund request identity after ambiguous responses and preserve successful
+  payout results when other merchants fail. Report cancelled merchants explicitly.
+- Persist the ledger balance and reset display corrections when rebuilding a
+  single merchant from the CLI.
+
 ## [1.9.2] - 2026-09-12
 
 ### Changed

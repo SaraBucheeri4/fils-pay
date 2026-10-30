@@ -210,7 +210,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.post<{ Params: { id: string; linkId: string }; Body: { resolution?: CaptureReviewResolution } }>(
+  app.post<{ Params: { id: string; linkId: string }; Body: { resolution?: CaptureReviewResolution; releaseEvidence?: string } }>(
     "/:id/payment-links/:linkId/capture-review",
     { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
     async (request) => {
@@ -227,6 +227,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
         linkId: request.params.linkId,
         adminUserId: adminAuth.adminUserId,
         resolution,
+        releaseEvidence: request.body?.releaseEvidence,
         timeoutSeconds: app.config.paymentLinkReservationTimeoutSeconds,
       });
     },

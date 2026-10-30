@@ -151,12 +151,12 @@ func main() {
 			if err != nil {
 				log.Fatalf("settlement rebuild-balances: invalid --merchant: %v", err)
 			}
-			// am: --merchant writes the cache for that one merchant, same as the full rebuild
-			before, err := ledger.RebuildMerchantBalance(ctx, pool, id)
+			// Fix: --merchant must persist the ledger balance and reset display corrections.
+			rebuilt, err := ledger.RefreshMerchantBalance(ctx, pool, id)
 			if err != nil {
 				log.Fatalf("settlement rebuild-balances: %v", err)
 			}
-			fmt.Printf("rebuild-balances: merchant=%s rebuilt=%d\n", id, before)
+			fmt.Printf("rebuild-balances: merchant=%s rebuilt=%d\n", id, rebuilt)
 			return
 		}
 

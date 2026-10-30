@@ -4,8 +4,10 @@ import { withTransaction } from "../db/withTransaction.js";
 import { recordTransactionEvent } from "../transactions/events.js";
 import { serializeTransaction, type TransactionRow } from "../transactions/serialize.js";
 import { NotFoundError } from "../lib/errors.js";
+import { guardPaymentLinkAttempt, type PaymentLinkClaim } from "./paymentLinkGuard.js";
 
 export interface VoidInput {
+  paymentLinkClaim?: PaymentLinkClaim;
   transactionId: string;
   merchantId: string;
   actor: { type: "merchant_session" | "merchant_api_key" | "system"; id: string };
@@ -41,6 +43,7 @@ export interface VoidResult {
 // am: route does roles. nvm
 export async function voidTransaction(pool: Pool, input: VoidInput): Promise<VoidResult> {
   return withTransaction(pool, async (client) => {
+    await guardPaymentLinkAttempt(client, input.transactionId, input.merchantId, input.paymentLinkClaim);
     const lockResult = await client.query<TransactionRow>(
       `SELECT * FROM transactions WHERE id = $1 AND merchant_id = $2 FOR UPDATE`,
       [input.transactionId, input.merchantId],

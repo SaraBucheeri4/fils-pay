@@ -10,6 +10,7 @@ import { serializeTransaction, type TransactionRow } from "../transactions/seria
 import { ConflictError, UnprocessableEntityError } from "../lib/errors.js";
 import { getEffectiveMdrBps } from "../fees/feeSchedule.js";
 import { getVolumeTierBonusBps } from "../fees/platformVolumeTier.js";
+import { guardPaymentLinkAttempt } from "./paymentLinkGuard.js";
 
 const ENDPOINT = "transactions.capture";
 
@@ -63,6 +64,7 @@ export async function captureTransaction(
   const requestHash = hashRequest({ transactionId: input.transactionId, amountFils: input.amountFils ?? null });
 
   return withTransaction(pool, async (client) => {
+    await guardPaymentLinkAttempt(client, input.transactionId, input.merchantId, input.paymentLinkClaim);
     const claim = await claimIdempotencyKey(client, {
       merchantId: input.merchantId,
       endpoint: ENDPOINT,
@@ -77,7 +79,7 @@ export async function captureTransaction(
       throw new ConflictError("request_in_progress");
     }
     if (claim.outcome === "replay") {
-      // No row lock is ever taken on this call.
+      // The payment-link guard may hold its link lock; replay needs no transaction-row lock.
       return { statusCode: claim.row.responseStatusCode ?? 200, body: claim.row.responseBody };
     }
     // 'fresh' / 'retry_after_failure' — continue.

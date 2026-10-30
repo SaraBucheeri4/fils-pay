@@ -480,9 +480,13 @@ func RunDailyBatch(ctx context.Context, db *pgxpool.Pool, businessDate time.Time
 		report.Failures = append(report.Failures, MerchantBatchFailure{MerchantID: merchantID, Err: err})
 		failures = append(failures, err)
 	}
-	for _, merchantID := range merchantIDs {
+	for index, merchantID := range merchantIDs {
 		if err := ctx.Err(); err != nil {
-			failures = append(failures, err)
+			// Cancellation used to return an error with zero failures, hiding
+			// the unprocessed merchants. Name every remaining merchant.
+			for _, pending := range merchantIDs[index:] {
+				fail(pending, err)
+			}
 			break
 		}
 		closeResult, err := CloseBatch(ctx, db, merchantID, businessDate)

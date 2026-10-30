@@ -5,6 +5,7 @@ import { endImpersonation } from "../admin/impersonation.js";
 import { UUID_RE } from "../admin/merchants.js";
 import { refreshAnalyticsRollups } from "../admin/reportingRebuild.js";
 import {
+  SettlementRunFailedError,
   triggerBalanceRebuild,
   triggerMdrRecalculation,
   triggerSettlementRunBatch,
@@ -15,6 +16,8 @@ import {
 } from "../admin/settlementClient.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { AppError, BadRequestError, NotFoundError, UnauthorizedError } from "../lib/errors.js";
+import { getBatchIntegrityReport } from "../settlement/query.js";
+import { listPaymentLinkCaptureReviews } from "../paymentLinks/captureReview.js";
 import { adminAdjustmentImportRoutes } from "./adminAdjustmentImport.js";
 import { adminAuthRoutes } from "./adminAuth.js";
 import { adminBalanceAdjustmentRoutes } from "./adminBalanceAdjustments.js";
@@ -88,6 +91,29 @@ export async function adminRoutes(app: FastifyInstance, options: AdminRoutesOpti
   // credits queue itself, and the create route on the merchant it credits.
   await app.register(adminCreditRoutes);
 
+  // These operational reports previously required merchant credentials or a
+  // known merchant ID. Finance can now discover blocked links across merchants
+  // and inspect integrity directly, without bypassing read-only impersonation.
+  app.get<{ Querystring: { limit?: string; offset?: string } }>("/payment-links/capture-reviews", {
+    preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")],
+  }, async (request) => {
+    const limit = Number(request.query.limit ?? 100);
+    const offset = Number(request.query.offset ?? 0);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 1000000) {
+      throw new BadRequestError("invalid_request", "limit must be 1-100 and offset 0-1000000");
+    }
+    return { reviews: await listPaymentLinkCaptureReviews(app.db, null, app.config.paymentLinkReservationTimeoutSeconds, limit, offset) };
+  });
+  app.get<{ Querystring: { merchantId?: string; from?: string; to?: string } }>("/settlement/batch-integrity", {
+    preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")],
+  }, async (request) => {
+    const { merchantId, from, to } = request.query;
+    if (!merchantId || !UUID_RE.test(merchantId) || !from || !to) {
+      throw new BadRequestError("invalid_request", "merchantId (UUID), from and to are required");
+    }
+    return getBatchIntegrityReport(app.db, { merchantId, from, to });
+  });
+
   /**
    * Settlement re-run.
    *
@@ -140,12 +166,16 @@ export async function adminRoutes(app: FastifyInstance, options: AdminRoutesOpti
         await markAdminAuditOutcome(app.db, auditLogId, "failed", {
           error: appErr?.code ?? "internal_error",
           message: (err as Error).message,
+          ...(err instanceof SettlementRunFailedError ? { settlementRun: err.settlementRun } : {}),
         }).catch((updateErr: unknown) => {
           request.log.error(
             { err: updateErr, auditLogId },
             "failed to record settlement_run_batch failure outcome on admin_audit_log",
           );
         });
+        if (err instanceof SettlementRunFailedError) {
+          return reply.code(500).send({ error: err.code, message: err.message, settlementRun: err.settlementRun });
+        }
         throw err;
       }
 

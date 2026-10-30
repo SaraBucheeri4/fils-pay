@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { describeError, request } from "../../api/client.js";
+import { useRef, useState } from "react";
+import { ApiError, describeError, request } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd } from "../../format.js";
@@ -14,6 +14,7 @@ interface RefundDrawerProps {
 /** Shown only when the release flag and this merchant's opt-in both allow it. */
 export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
   const { me } = useDashboardAuth();
+  const pendingRefund = useRef<{ transactionId: string; amountText: string; amountFils: number; key: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -26,7 +27,12 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
 
     let amountFils: number | undefined;
     try {
-      amountFils = parseRefundAmountFils(amount, remaining);
+      // A refreshed balance must not change an ambiguous request, especially
+      // when blank originally meant "all remaining". Replay its original body.
+      const pending = pendingRefund.current;
+      amountFils = pending?.transactionId === txn.id && pending.amountText === amount.trim()
+        ? pending.amountFils
+        : parseRefundAmountFils(amount, remaining);
     } catch (err) {
       setError(err instanceof RangeError ? err.message : "Enter an amount in BD, up to three decimals.");
       return;
@@ -38,18 +44,28 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
     setSubmitting(true);
     setError(null);
     try {
-      // Left blank, amountFils is omitted and the API refunds everything still
-      // refundable. A fresh key per click, including a retry after a decline.
+      // A fresh key per click could duplicate a committed partial refund when
+      // its response was lost. Reuse one key and exact amount until a definite
+      // response; blank amounts also become explicit so retries cannot change
+      // their meaning as the refundable balance changes.
+      const requestedAmount = amountFils ?? remaining;
+      if (!pendingRefund.current || pendingRefund.current.transactionId !== txn.id || pendingRefund.current.amountFils !== requestedAmount) {
+        pendingRefund.current = { transactionId: txn.id, amountText: amount.trim(), amountFils: requestedAmount, key: crypto.randomUUID() };
+      }
       await request("/v1/refunds", {
         method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ transactionId: txn.id, ...(amountFils === undefined ? {} : { amountFils }) }),
+        headers: { "Idempotency-Key": pendingRefund.current.key },
+        body: JSON.stringify({ transactionId: txn.id, amountFils: requestedAmount }),
       });
+      pendingRefund.current = null;
       setOpen(false);
       setAmount("");
       // Refetch rather than patch: the refund also wrote a timeline event.
-      await onRefunded();
+      await onRefunded().catch(() => setError("Refund succeeded. Refresh the page to see the updated balance."));
     } catch (err) {
+      // Transport failures, 5xx and in-progress conflicts are ambiguous; retain
+      // the key. A definite rejection permits a new attempt after correction.
+      if (err instanceof ApiError && [400, 401, 402, 403, 404, 410, 422, 429].includes(err.statusCode)) pendingRefund.current = null;
       setError(describeError(err));
     } finally {
       setSubmitting(false);

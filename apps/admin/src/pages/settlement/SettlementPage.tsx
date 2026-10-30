@@ -2,7 +2,7 @@ import { useState } from "react";
 import { formatBhd, toFils } from "@filspay/money";
 import { rebuildAnalytics, rebuildBalances, runBatch } from "../../api/settlement.js";
 import { recalculateMdr } from "../../api/mdrRecalculation.js";
-import { describeError } from "../../api/client.js";
+import { ApiError, describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { completedBahrainDate } from "../../format.js";
 import type {
@@ -61,7 +61,14 @@ export function SettlementPage() {
         await runBatch({ date, merchantId: merchantId.trim() ? merchantId.trim() : undefined }),
       );
     } catch (err) {
-      setRunError(describeError(err));
+      // A 500 can follow successful payouts. Keep those rows visible and
+      // identify failed merchants instead of implying nothing ran.
+      if (err instanceof ApiError && err.body.settlementRun) {
+        setRunResult(err.body.settlementRun);
+        setRunError(`${describeError(err)} Failed merchants: ${err.body.settlementRun.failedMerchantIds.join(", ") || "run interrupted before merchant selection"}`);
+      } else {
+        setRunError(describeError(err));
+      }
     } finally {
       setRunBusy(false);
     }

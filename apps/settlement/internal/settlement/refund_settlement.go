@@ -104,6 +104,19 @@ func carryPayout(net, carry money.Fils) (money.Fils, money.Fils, error) {
 // a whole transaction's fee is exact from its journal, while an ambiguous
 // legacy transaction spanning batches requires separate historical review.
 func actualCaptureFees(ctx context.Context, tx pgx.Tx, merchantID, txnID uuid.UUID, events []eligibleEvent) (money.Fils, error) {
+	// A synthetic fee previously reduced payout without a ledger posting.
+	// Require the capture gross to exist: inventing historical money movements
+	// is a repair operation, not settlement. The close rolls back for review.
+	var grossEvents, grossJournal int64
+	if err := tx.QueryRow(ctx, `SELECT
+      (SELECT COALESCE(SUM(amount_fils),0) FROM transaction_events WHERE transaction_id = $1 AND event_type IN ('captured','partially_captured')),
+      (SELECT COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount_fils ELSE -amount_fils END),0)
+       FROM ledger_entries WHERE transaction_id = $1 AND account_id = 'card_scheme_clearing' AND description LIKE 'capture%')`, txnID).Scan(&grossEvents, &grossJournal); err != nil {
+		return 0, err
+	}
+	if grossEvents != grossJournal {
+		return 0, fmt.Errorf("transaction %s capture gross is not fully journaled; historical review required", txnID)
+	}
 	var eventCount int
 	var charged int64
 	var discounted bool
@@ -117,11 +130,51 @@ func actualCaptureFees(ctx context.Context, tx pgx.Tx, merchantID, txnID uuid.UU
 	if err != nil {
 		return 0, err
 	}
+	var payableJournal int64
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END),0)
+      FROM ledger_entries WHERE transaction_id = $1 AND account_id = 'merchant_payable' AND description LIKE 'capture%'`, txnID).Scan(&payableJournal); err != nil {
+		return 0, err
+	}
+	expectedPayable, err := subtractFinancialFils(money.Fils(grossJournal), money.Fils(charged))
+	if err != nil {
+		return 0, err
+	}
+	if money.Fils(payableJournal) != expectedPayable {
+		return 0, fmt.Errorf("transaction %s capture payable disagrees with gross and fee journals; review required", txnID)
+	}
+	if eventCount == len(events) && allHaveFeeSnapshot(events) {
+		var snapshot money.Fils
+		for _, e := range events {
+			snapshot, err = addFinancialFils(snapshot, money.Fils(*e.feeFils))
+			if err != nil {
+				return 0, err
+			}
+		}
+		if !discounted && snapshot != money.Fils(charged) {
+			return 0, fmt.Errorf("transaction %s fee snapshot disagrees with journal; review required", txnID)
+		}
+	}
 	if eventCount == len(events) && (charged != 0 || allHaveFeeSnapshot(events)) {
 		return money.Fils(charged), nil
 	}
 	var total money.Fils
 	for _, e := range events {
+		// A snapshot in a partial-batch transaction must also have its fee
+		// journal; otherwise this branch could still withhold unposted money.
+		if e.feeFils != nil && !discounted {
+			var journalFee int64
+			if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(CASE WHEN l.direction = 'credit' THEN l.amount_fils ELSE -l.amount_fils END),0)
+              FROM ledger_entries l WHERE l.transaction_id = $1 AND l.account_id = 'platform_fee_revenue'
+                AND l.description LIKE 'capture%' AND
+                CASE WHEN (SELECT metadata->>'entryGroupId' FROM transaction_events WHERE id = $3) IS NOT NULL
+                  THEN l.entry_group_id::text = (SELECT metadata->>'entryGroupId' FROM transaction_events WHERE id = $3)
+                  ELSE l.occurred_at = $2 END`, txnID, e.occurredAt, e.id).Scan(&journalFee); err != nil {
+				return 0, err
+			}
+			if journalFee != *e.feeFils {
+				return 0, fmt.Errorf("capture event %d fee snapshot disagrees with journal; review required", e.id)
+			}
+		}
 		if e.modernFee && e.feeFils != nil {
 			total, err = addFinancialFils(total, money.Fils(*e.feeFils))
 			if err != nil {
@@ -149,6 +202,21 @@ func actualCaptureFees(ctx context.Context, tx pgx.Tx, merchantID, txnID uuid.UU
 		if fee == 0 {
 			eventFee, err = unrecordedEventFee(ctx, tx, merchantID, e)
 			if err != nil {
+				return 0, err
+			}
+			// Journal the newly priced fee atomically with close and persist
+			// its snapshot. Event row locks and the batch claim prevent retry
+			// duplication; reports now read the same recorded fee as payout.
+			if eventFee > 0 {
+				_, err = tx.Exec(ctx, `INSERT INTO ledger_entries
+                  (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description) VALUES
+                  ($1,$2,$3,'merchant_payable','debit',$4,$5,'capture: settlement fallback fee'),
+                  ($1,$2,$3,'platform_fee_revenue','credit',$4,$5,'capture: settlement fallback fee')`, uuid.New(), merchantID, txnID, int64(eventFee), e.occurredAt)
+				if err != nil {
+					return 0, err
+				}
+			}
+			if _, err = tx.Exec(ctx, `UPDATE transaction_events SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('feeFils', $2::bigint, 'pricingVersion', 'discount-before-mdr') WHERE id = $1`, e.id, int64(eventFee)); err != nil {
 				return 0, err
 			}
 		}

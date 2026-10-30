@@ -144,14 +144,12 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 	return RecalcResult{BatchesConsidered: len(batches), Adjusted: adjusted}, nil
 }
 
-// recomputeBatchFee sums ComputeSettlementFee over every transaction_events
-// row carrying this batch's id — the same per-event-then-sum discipline
-// CloseBatch step 8 uses, never ApplyRateFils applied once to a pre-summed
-// total, so this recomputation can never itself diverge from what a fresh
-// CloseBatch would have produced at today's rate.
+// recomputeBatchFee reprices ordinary events per capture, preserving recorded
+// tier-priced fees until finance approves changing them. It never applies the
+// current platform threshold to historical activity.
 func recomputeBatchFee(ctx context.Context, tx pgx.Tx, batchID uuid.UUID, mdrBps, discountBps int64) (money.Fils, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT amount_fils FROM transaction_events WHERE settlement_batch_id = $1 AND event_type IN ('captured', 'partially_captured') ORDER BY id
+		SELECT amount_fils, (metadata->>'feeFils')::bigint, COALESCE((metadata->>'volumeTierBonusBps')::bigint, 0) FROM transaction_events WHERE settlement_batch_id = $1 AND event_type IN ('captured', 'partially_captured') ORDER BY id
 	`, batchID)
 	if err != nil {
 		return 0, fmt.Errorf("settlement: RecalculateMDR: select batch events for %s: %w", batchID, err)
@@ -160,13 +158,27 @@ func recomputeBatchFee(ctx context.Context, tx pgx.Tx, batchID uuid.UUID, mdrBps
 
 	var fee money.Fils
 	for rows.Next() {
-		var amountFils int64
-		if err := rows.Scan(&amountFils); err != nil {
+		var amountFils, bonus int64
+		var recordedFee *int64
+		if err := rows.Scan(&amountFils, &recordedFee, &bonus); err != nil {
 			return 0, fmt.Errorf("settlement: RecalculateMDR: scan batch event for %s: %w", batchID, err)
 		}
 		// FH: sums every event with this batch id -- incl. refund events once FP-212 lands? need an event_type filter?
 		// MK: refunds won't carry settlement_batch_id on transaction_events, they live in their own table. non-issue
-		fee += ComputeSettlementFee(money.Fils(amountFils), mdrBps, discountBps)
+		// Ignoring the tier used to reclaim an already-granted discount.
+		// Freeze tier-priced events at their recorded fee pending finance's
+		// decision (ADR-0014); today's threshold never reprices past captures.
+		eventFee := ComputeSettlementFee(money.Fils(amountFils), mdrBps, discountBps)
+		if bonus != 0 {
+			if recordedFee == nil {
+				return 0, fmt.Errorf("tier-priced capture has no recorded fee; review required")
+			}
+			eventFee = money.Fils(*recordedFee)
+		}
+		fee, err = addFinancialFils(fee, eventFee)
+		if err != nil {
+			return 0, err
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return 0, fmt.Errorf("settlement: RecalculateMDR: iterate batch events for %s: %w", batchID, err)

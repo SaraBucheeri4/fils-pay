@@ -11,6 +11,7 @@
 /** The uniform error body shape apps/api's error handler produces:
  *  `{ error: "code", message?: "string" }` — identical to apps/web's. */
 export interface ApiErrorBody {
+  settlementRun?: RunBatchSummary & { failedMerchantIds: string[] };
   error: string;
   message?: string;
   [key: string]: unknown;

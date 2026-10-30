@@ -137,9 +137,15 @@ export async function payPaymentLink(
     merchantId: link.merchantId,
     idempotencyKey: captureKey,
     actor: { type: "system", id: link.id },
+  }).catch((error: unknown) => {
+    console.error("payment_link_capture_outcome_unknown", { linkId: link.id, transactionId: txnId });
+    throw error;
   });
 
-  if (captureResult.statusCode >= 500) {
+  // Previously every non-5xx was treated as a refusal; local conflicts can
+  // follow a successful remote charge. Only an explicit 402 permits release.
+  if (captureResult.statusCode !== 200 && captureResult.statusCode !== 402) {
+    console.error("payment_link_capture_outcome_unknown", { linkId: link.id, transactionId: txnId, statusCode: captureResult.statusCode });
     return {
       statusCode: captureResult.statusCode,
       body: { stage: "capture", ...(captureResult.body as Record<string, unknown>) },
@@ -148,7 +154,11 @@ export async function payPaymentLink(
 
   if (captureResult.statusCode !== 200) {
     // A definite refusal: no money moved, so return the authorization and the link.
-    await voidUncapturedAuthorization(pool, txnId, link);
+    const voided = await voidTransaction(pool, {
+      transactionId: txnId, merchantId: link.merchantId, actor: { type: "system", id: link.id },
+      paymentLinkClaim: { linkId: link.id, reservationId: claimedRow.reservation_id },
+    });
+    if (voided.statusCode !== 200) return { statusCode: 409, body: { error: "capture_outcome_still_unknown" } };
     await releaseReservation(pool, link.id, claimedRow.reservation_id);
     return {
       statusCode: captureResult.statusCode,

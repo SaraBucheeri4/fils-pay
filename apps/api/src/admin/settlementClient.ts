@@ -21,6 +21,12 @@ export interface RunBatchSummary {
   merchantResults: MerchantBatchOutcome[];
 }
 
+export class SettlementRunFailedError extends AppError {
+  constructor(readonly settlementRun: RunBatchSummary & { failedMerchantIds: string[] }) {
+    super(500, "settlement_run_failed", "Settlement run had failures; inspect successful and failed merchants before retrying");
+  }
+}
+
 export interface RebuildDiff {
   merchantId: string;
   before: number;
@@ -131,6 +137,15 @@ async function callSettlementInternal(
   }
 
   if (!response.ok) {
+    // Previously the client reduced a partial payout result to a text excerpt.
+    // Preserve the typed success/failure lists for the admin response and audit.
+    if (path === "/internal/run-batch" && response.status === 500) {
+      const failure: unknown = await response.clone().json().catch(() => null);
+      if (isRecord(failure) && failure.error === "run_batch_failed" && Array.isArray(failure.merchantResults)
+          && Array.isArray(failure.failedMerchantIds) && failure.failedMerchantIds.every((id) => typeof id === "string")) {
+        throw new SettlementRunFailedError({ ...decodeRunBatchSummary(failure), failedMerchantIds: failure.failedMerchantIds });
+      }
+    }
     let excerpt = "";
     try {
       excerpt = (await response.text()).slice(0, 500);
@@ -177,6 +192,10 @@ export async function triggerSettlementRunBatch(
     throw new AppError(500, "settlement_run_failed", "settlement run-batch returned a non-object body");
   }
 
+  return decodeRunBatchSummary(decoded);
+}
+
+function decodeRunBatchSummary(decoded: Record<string, unknown>): RunBatchSummary {
   const rawResults = pick(decoded, "MerchantResults", "merchantResults");
   const merchantResults = Array.isArray(rawResults) ? rawResults : [];
 

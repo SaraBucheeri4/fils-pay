@@ -28,6 +28,34 @@ func RebuildMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uu
 	return money.Fils(balance), nil
 }
 
+// RefreshMerchantBalance fixes the CLI's --merchant path, which previously
+// only calculated a number and left the cache untouched. Lock cache writers
+// before the ledger snapshot, replace payable and clear display corrections
+// atomically, with the same semantics as the full rebuild (ADR-0011).
+func RefreshMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID) (money.Fils, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	if _, err := tx.Exec(ctx, `LOCK TABLE merchant_balances IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+		return 0, err
+	}
+	var balance int64
+	err = tx.QueryRow(ctx, `INSERT INTO merchant_balances (merchant_id, cached_payable_fils, display_adjustment_fils, updated_at)
+      SELECT $1, COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END),0), 0, now()
+      FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'
+      ON CONFLICT (merchant_id) DO UPDATE SET cached_payable_fils = EXCLUDED.cached_payable_fils,
+        display_adjustment_fils = 0, updated_at = now() RETURNING cached_payable_fils`, merchantID).Scan(&balance)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return money.Fils(balance), nil
+}
+
 // RebuildDiff is the before/after state for one merchant, printed by the
 // rebuild-balances CLI subcommand so an operator sees exactly what
 // changed.
